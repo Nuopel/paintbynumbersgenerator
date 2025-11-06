@@ -1,14 +1,17 @@
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
 define("common", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.CancellationToken = void 0;
+    exports.delay = delay;
     function delay(ms) {
         return __awaiter(this, void 0, void 0, function* () {
             if (typeof window !== "undefined") {
@@ -19,7 +22,6 @@ define("common", ["require", "exports"], function (require, exports) {
             }
         });
     }
-    exports.delay = delay;
     class CancellationToken {
         constructor() {
             this.isCancelled = false;
@@ -30,6 +32,7 @@ define("common", ["require", "exports"], function (require, exports) {
 define("random", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Random = void 0;
     class Random {
         constructor(seed) {
             if (typeof seed === "undefined") {
@@ -46,103 +49,327 @@ define("random", ["require", "exports"], function (require, exports) {
     }
     exports.Random = Random;
 });
-define("lib/clustering", ["require", "exports"], function (require, exports) {
+/**
+ * Vector class for K-means clustering
+ *
+ * Represents a point in n-dimensional space with optional weight and metadata.
+ * Used primarily for color clustering in RGB/HSL/LAB color spaces.
+ *
+ * @module Vector
+ */
+define("lib/Vector", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Vector = void 0;
+    /**
+     * A vector in n-dimensional space with weight and optional metadata
+     */
     class Vector {
-        constructor(values, weight = 1) {
+        /**
+         * Create a new vector
+         *
+         * @param values - Array of dimensional values
+         * @param weight - Weight for weighted operations (default: 1)
+         * @param tag - Optional metadata tag
+         *
+         * @example
+         * ```typescript
+         * // Create RGB color vector
+         * const colorVec = new Vector([255, 128, 0], 1, { r: 255, g: 128, b: 0 });
+         *
+         * // Create weighted point
+         * const weightedVec = new Vector([1, 2, 3], 5);
+         * ```
+         */
+        constructor(values, weight = 1, tag) {
             this.values = values;
             this.weight = weight;
+            this.tag = tag;
         }
-        distanceTo(p) {
+        /**
+         * Calculate Euclidean distance to another vector
+         *
+         * @param other - Vector to calculate distance to
+         * @returns Euclidean distance between vectors
+         *
+         * @example
+         * ```typescript
+         * const v1 = new Vector([0, 0]);
+         * const v2 = new Vector([3, 4]);
+         * const dist = v1.distanceTo(v2); // Returns 5
+         * ```
+         */
+        distanceTo(other) {
             let sumSquares = 0;
             for (let i = 0; i < this.values.length; i++) {
-                sumSquares += (p.values[i] - this.values[i]) * (p.values[i] - this.values[i]);
+                const diff = other.values[i] - this.values[i];
+                sumSquares += diff * diff;
             }
             return Math.sqrt(sumSquares);
         }
         /**
-         *  Calculates the weighted average of the given points
+         * Calculate weighted average of multiple vectors
+         *
+         * Computes the centroid of a set of vectors, taking their weights into account.
+         *
+         * @param vectors - Array of vectors to average
+         * @returns New vector representing the weighted average
+         * @throws Error if vectors array is empty
+         *
+         * @example
+         * ```typescript
+         * const v1 = new Vector([0, 0], 1);
+         * const v2 = new Vector([10, 10], 2);
+         * const avg = Vector.average([v1, v2]);
+         * // Returns approximately Vector([6.67, 6.67])
+         * ```
          */
-        static average(pts) {
-            if (pts.length === 0) {
-                throw Error("Can't average 0 elements");
+        static average(vectors) {
+            if (vectors.length === 0) {
+                throw new Error("Cannot average empty array of vectors");
             }
-            const dims = pts[0].values.length;
-            const values = [];
-            for (let i = 0; i < dims; i++) {
-                values.push(0);
-            }
+            const dims = vectors[0].values.length;
+            const values = new Array(dims).fill(0);
             let weightSum = 0;
-            for (const p of pts) {
-                weightSum += p.weight;
+            for (const vec of vectors) {
+                weightSum += vec.weight;
                 for (let i = 0; i < dims; i++) {
-                    values[i] += p.weight * p.values[i];
+                    values[i] += vec.weight * vec.values[i];
                 }
             }
+            // Normalize by total weight
             for (let i = 0; i < values.length; i++) {
                 values[i] /= weightSum;
             }
-            return new Vector(values);
+            return new Vector(values, weightSum);
+        }
+        /**
+         * Create a deep clone of this vector
+         *
+         * @returns New vector with copied values
+         *
+         * @example
+         * ```typescript
+         * const original = new Vector([1, 2, 3], 5, { data: 'test' });
+         * const copy = original.clone();
+         * copy.values[0] = 999; // Original unchanged
+         * ```
+         */
+        clone() {
+            return new Vector([...this.values], this.weight, this.tag);
+        }
+        /**
+         * Get the dimensionality of this vector
+         *
+         * @returns Number of dimensions
+         */
+        get dimensions() {
+            return this.values.length;
+        }
+        /**
+         * Get the squared magnitude of this vector
+         *
+         * @returns Sum of squared values
+         *
+         * @example
+         * ```typescript
+         * const v = new Vector([3, 4]);
+         * const magSq = v.magnitudeSquared(); // Returns 25
+         * ```
+         */
+        magnitudeSquared() {
+            let sum = 0;
+            for (let i = 0; i < this.values.length; i++) {
+                sum += this.values[i] * this.values[i];
+            }
+            return sum;
+        }
+        /**
+         * Get the magnitude (length) of this vector
+         *
+         * @returns Euclidean length of the vector
+         *
+         * @example
+         * ```typescript
+         * const v = new Vector([3, 4]);
+         * const mag = v.magnitude(); // Returns 5
+         * ```
+         */
+        magnitude() {
+            return Math.sqrt(this.magnitudeSquared());
         }
     }
     exports.Vector = Vector;
+});
+/**
+ * K-means clustering algorithm implementation
+ *
+ * Provides K-means clustering for color quantization and general vector clustering.
+ * Uses Lloyd's algorithm with random initialization.
+ *
+ * @module clustering
+ */
+define("lib/clustering", ["require", "exports", "lib/Vector", "lib/Vector"], function (require, exports, Vector_1, Vector_2) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.KMeans = exports.Vector = void 0;
+    Object.defineProperty(exports, "Vector", { enumerable: true, get: function () { return Vector_2.Vector; } });
+    /**
+     * K-means clustering algorithm
+     *
+     * Implements the standard K-means algorithm (Lloyd's algorithm) for clustering
+     * vectors into k groups. Commonly used for color quantization in the paint-by-numbers
+     * generation process.
+     *
+     * @example
+     * ```typescript
+     * const random = new Random(42);
+     * const points = [
+     *   new Vector([255, 0, 0]),    // Red
+     *   new Vector([0, 255, 0]),    // Green
+     *   new Vector([0, 0, 255]),    // Blue
+     * ];
+     *
+     * const kmeans = new KMeans(points, 3, random);
+     * while (kmeans.currentDeltaDistanceDifference > 1) {
+     *   kmeans.step();
+     * }
+     * console.log(`Converged in ${kmeans.currentIteration} iterations`);
+     * ```
+     */
     class KMeans {
+        /**
+         * Create a new K-means clustering instance
+         *
+         * @param points - Data points to cluster
+         * @param k - Number of clusters
+         * @param random - Random number generator (for deterministic results)
+         * @param centroids - Optional initial centroids (if null, random initialization is used)
+         *
+         * @example
+         * ```typescript
+         * const random = new Random(42);  // Fixed seed for reproducibility
+         * const data = [new Vector([1, 2]), new Vector([3, 4])];
+         * const kmeans = new KMeans(data, 2, random);
+         * ```
+         */
         constructor(points, k, random, centroids = null) {
             this.points = points;
             this.k = k;
             this.random = random;
+            /** Current iteration count */
             this.currentIteration = 0;
+            /** Vectors assigned to each cluster (indexed by cluster) */
             this.pointsPerCategory = [];
+            /** Current cluster centroids */
             this.centroids = [];
+            /** Sum of distances that centroids moved in last step */
             this.currentDeltaDistanceDifference = 0;
             if (centroids != null) {
+                // Use provided centroids
                 this.centroids = centroids;
                 for (let i = 0; i < this.k; i++) {
                     this.pointsPerCategory.push([]);
                 }
             }
             else {
+                // Random initialization
                 this.initCentroids();
             }
         }
+        /**
+         * Initialize centroids by randomly selecting from data points
+         *
+         * @private
+         */
         initCentroids() {
             for (let i = 0; i < this.k; i++) {
-                this.centroids.push(this.points[Math.floor(this.points.length * this.random.next())]);
+                // Select random point as initial centroid
+                const randomIndex = Math.floor(this.points.length * this.random.next());
+                this.centroids.push(this.points[randomIndex]);
                 this.pointsPerCategory.push([]);
             }
         }
+        /**
+         * Perform one iteration of the K-means algorithm
+         *
+         * Steps:
+         * 1. Assign each point to nearest centroid (assignment step)
+         * 2. Recalculate centroids as mean of assigned points (update step)
+         * 3. Calculate how much centroids moved (for convergence detection)
+         *
+         * @example
+         * ```typescript
+         * const kmeans = new KMeans(data, 3, random);
+         *
+         * // Run until convergence
+         * while (kmeans.currentDeltaDistanceDifference > 0.1 &&
+         *        kmeans.currentIteration < 100) {
+         *   kmeans.step();
+         * }
+         * ```
+         */
         step() {
-            // clear category
+            // Clear previous assignments
             for (let i = 0; i < this.k; i++) {
                 this.pointsPerCategory[i] = [];
             }
-            // calculate points per centroid
-            for (const p of this.points) {
-                let minDist = Number.MAX_VALUE;
-                let centroidIndex = -1;
+            // Assignment step: assign each point to nearest centroid
+            for (const point of this.points) {
+                let minDistance = Number.MAX_VALUE;
+                let nearestCentroidIndex = -1;
                 for (let k = 0; k < this.k; k++) {
-                    const dist = this.centroids[k].distanceTo(p);
-                    if (dist < minDist) {
-                        centroidIndex = k;
-                        minDist = dist;
+                    const distance = this.centroids[k].distanceTo(point);
+                    if (distance < minDistance) {
+                        nearestCentroidIndex = k;
+                        minDistance = distance;
                     }
                 }
-                this.pointsPerCategory[centroidIndex].push(p);
+                this.pointsPerCategory[nearestCentroidIndex].push(point);
             }
-            let totalDistanceDiff = 0;
-            // adjust centroids
+            // Update step: recalculate centroids
+            let totalDistanceMoved = 0;
             for (let k = 0; k < this.pointsPerCategory.length; k++) {
-                const cat = this.pointsPerCategory[k];
-                if (cat.length > 0) {
-                    const avg = Vector.average(cat);
-                    const dist = this.centroids[k].distanceTo(avg);
-                    totalDistanceDiff += dist;
-                    this.centroids[k] = avg;
+                const cluster = this.pointsPerCategory[k];
+                if (cluster.length > 0) {
+                    // Calculate new centroid as weighted average
+                    const newCentroid = Vector_1.Vector.average(cluster);
+                    // Track how much this centroid moved
+                    const distanceMoved = this.centroids[k].distanceTo(newCentroid);
+                    totalDistanceMoved += distanceMoved;
+                    // Update centroid
+                    this.centroids[k] = newCentroid;
                 }
             }
-            this.currentDeltaDistanceDifference = totalDistanceDiff;
+            this.currentDeltaDistanceDifference = totalDistanceMoved;
             this.currentIteration++;
+        }
+        /**
+         * Get the cluster index for a given point
+         *
+         * @param point - Point to classify
+         * @returns Index of nearest cluster (0 to k-1)
+         */
+        classify(point) {
+            let minDistance = Number.MAX_VALUE;
+            let nearestIndex = 0;
+            for (let k = 0; k < this.k; k++) {
+                const distance = this.centroids[k].distanceTo(point);
+                if (distance < minDistance) {
+                    nearestIndex = k;
+                    minDistance = distance;
+                }
+            }
+            return nearestIndex;
+        }
+        /**
+         * Check if algorithm has converged
+         *
+         * @param threshold - Maximum allowed centroid movement
+         * @returns true if converged (movement below threshold)
+         */
+        hasConverged(threshold) {
+            return this.currentDeltaDistanceDifference <= threshold;
         }
     }
     exports.KMeans = KMeans;
@@ -151,6 +378,10 @@ define("lib/clustering", ["require", "exports"], function (require, exports) {
 define("lib/colorconversion", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.rgbToHsl = rgbToHsl;
+    exports.hslToRgb = hslToRgb;
+    exports.lab2rgb = lab2rgb;
+    exports.rgb2lab = rgb2lab;
     /**
       * Converts an RGB color value to HSL. Conversion formula
       * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
@@ -189,7 +420,6 @@ define("lib/colorconversion", ["require", "exports"], function (require, exports
         }
         return [h, s, l];
     }
-    exports.rgbToHsl = rgbToHsl;
     /**
      * Converts an HSL color value to RGB. Conversion formula
      * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
@@ -233,7 +463,6 @@ define("lib/colorconversion", ["require", "exports"], function (require, exports
         }
         return [r * 255, g * 255, b * 255];
     }
-    exports.hslToRgb = hslToRgb;
     // From https://github.com/antimatter15/rgb-lab/blob/master/color.js
     function lab2rgb(lab) {
         let y = (lab[0] + 16) / 116, x = lab[1] / 500 + y, z = y - lab[2] / 200, r, g, b;
@@ -250,7 +479,6 @@ define("lib/colorconversion", ["require", "exports"], function (require, exports
             Math.max(0, Math.min(1, g)) * 255,
             Math.max(0, Math.min(1, b)) * 255];
     }
-    exports.lab2rgb = lab2rgb;
     function rgb2lab(rgb) {
         let r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255, x, y, z;
         r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
@@ -264,32 +492,144 @@ define("lib/colorconversion", ["require", "exports"], function (require, exports
         z = (z > 0.008856) ? Math.pow(z, 1 / 3) : (7.787 * z) + 16 / 116;
         return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
     }
-    exports.rgb2lab = rgb2lab;
 });
-define("settings", ["require", "exports"], function (require, exports) {
+/**
+ * Constants and enums for Paint by Numbers Generator
+ *
+ * This module centralizes all magic numbers and configuration constants
+ * to improve maintainability and code clarity.
+ *
+ * @module constants
+ */
+define("lib/constants", ["require", "exports", "settings"], function (require, exports, settings_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.RANDOM_SEED_CONSTANTS = exports.SVG_CONSTANTS = exports.SEGMENTATION_CONSTANTS = exports.IMAGE_CONSTANTS = exports.BIT_CONSTANTS = exports.FACET_THRESHOLDS = exports.UPDATE_INTERVALS = exports.CLUSTERING_DEFAULTS = exports.ColorSpace = void 0;
+    Object.defineProperty(exports, "ColorSpace", { enumerable: true, get: function () { return settings_1.ClusteringColorSpace; } });
+    /**
+     * Default parameters for K-means clustering
+     */
+    exports.CLUSTERING_DEFAULTS = {
+        /** Maximum number of clustering iterations */
+        MAX_ITERATIONS: 100,
+        /** Convergence threshold for cluster centers (delta distance) */
+        CONVERGENCE_THRESHOLD: 1,
+        /** Default number of color clusters */
+        DEFAULT_COLOR_COUNT: 16,
+        /** Minimum number of colors allowed */
+        MIN_COLOR_COUNT: 2,
+        /** Maximum number of colors allowed */
+        MAX_COLOR_COUNT: 256,
+        /** Maximum delta distance for progress calculation */
+        MAX_DELTA_DISTANCE_FOR_PROGRESS: 100,
+    };
+    /**
+     * UI update intervals in milliseconds
+     */
+    exports.UPDATE_INTERVALS = {
+        /** Progress bar update interval during processing */
+        PROGRESS_UPDATE_MS: 500,
+        /** Debounce delay for user input changes */
+        INPUT_DEBOUNCE_MS: 300,
+        /** Frequency of updates during iterative processes (every N items) */
+        BATCH_UPDATE_FREQUENCY: 100,
+    };
+    /**
+     * Facet processing thresholds
+     */
+    exports.FACET_THRESHOLDS = {
+        /** Minimum facet size in pixels before removal */
+        MIN_FACET_SIZE: 20,
+        /** Maximum facet count before forced reduction */
+        MAX_FACET_COUNT: Number.MAX_VALUE,
+        /** Minimum border point count for a valid facet */
+        MIN_BORDER_POINTS: 3,
+        /** Minimum path length before reduction */
+        MIN_PATH_LENGTH_FOR_REDUCTION: 5,
+    };
+    /**
+     * Bit manipulation constants for pixel data processing
+     */
+    exports.BIT_CONSTANTS = {
+        /** Number of bits per color channel in RGB */
+        BITS_PER_CHANNEL: 8,
+        /** Maximum value for 8-bit color channel */
+        MAX_CHANNEL_VALUE: 255,
+        /** Number of bits to chop off for color grouping (reduces precision) */
+        BITS_TO_CHOP_OFF: 2,
+        /** Bit shift for RGBA packing */
+        RGBA_SHIFT: 2,
+    };
+    /**
+     * Image processing constants
+     */
+    exports.IMAGE_CONSTANTS = {
+        /** Default JPEG quality for exports */
+        JPEG_QUALITY: 0.95,
+        /** Default PNG compression level */
+        PNG_COMPRESSION: 6,
+        /** Maximum image dimension before warning */
+        MAX_DIMENSION_WARNING: 2000,
+        /** Default resize width for large images */
+        DEFAULT_RESIZE_WIDTH: 1024,
+        /** Default resize height for large images */
+        DEFAULT_RESIZE_HEIGHT: 1024,
+    };
+    /**
+     * Border segmentation constants
+     */
+    exports.SEGMENTATION_CONSTANTS = {
+        /** Default number of times to halve border segments for smoothing */
+        DEFAULT_HALVE_ITERATIONS: 2,
+        /** Maximum distance between segment endpoints for matching */
+        MAX_SEGMENT_MATCH_DISTANCE: 4,
+        /** Number of narrow pixel strip cleanup runs */
+        DEFAULT_NARROW_STRIP_CLEANUP_RUNS: 3,
+    };
+    /**
+     * SVG output constants
+     */
+    exports.SVG_CONSTANTS = {
+        /** Default font size for color labels */
+        DEFAULT_FONT_SIZE: 50,
+        /** Default font color for labels */
+        DEFAULT_FONT_COLOR: "black",
+        /** Default stroke width for paths */
+        DEFAULT_STROKE_WIDTH: 1,
+    };
+    /**
+     * Random seed constants
+     */
+    exports.RANDOM_SEED_CONSTANTS = {
+        /** Special value indicating random seed should be generated */
+        USE_CURRENT_TIME: 0,
+    };
+});
+define("settings", ["require", "exports", "lib/constants"], function (require, exports, constants_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Settings = exports.ClusteringColorSpace = void 0;
     var ClusteringColorSpace;
     (function (ClusteringColorSpace) {
         ClusteringColorSpace[ClusteringColorSpace["RGB"] = 0] = "RGB";
         ClusteringColorSpace[ClusteringColorSpace["HSL"] = 1] = "HSL";
         ClusteringColorSpace[ClusteringColorSpace["LAB"] = 2] = "LAB";
-    })(ClusteringColorSpace = exports.ClusteringColorSpace || (exports.ClusteringColorSpace = {}));
+    })(ClusteringColorSpace || (exports.ClusteringColorSpace = ClusteringColorSpace = {}));
     class Settings {
         constructor() {
-            this.kMeansNrOfClusters = 16;
-            this.kMeansMinDeltaDifference = 1;
+            this.kMeansNrOfClusters = constants_1.CLUSTERING_DEFAULTS.DEFAULT_COLOR_COUNT;
+            this.kMeansMinDeltaDifference = constants_1.CLUSTERING_DEFAULTS.CONVERGENCE_THRESHOLD;
             this.kMeansClusteringColorSpace = ClusteringColorSpace.RGB;
             this.kMeansColorRestrictions = [];
             this.colorAliases = {};
-            this.narrowPixelStripCleanupRuns = 3; // 3 seems like a good compromise between removing enough narrow pixel strips to convergence. This fixes e.g. https://i.imgur.com/dz4ANz1.png
-            this.removeFacetsSmallerThanNrOfPoints = 20;
+            this.narrowPixelStripCleanupRuns = constants_1.SEGMENTATION_CONSTANTS.DEFAULT_NARROW_STRIP_CLEANUP_RUNS; // 3 seems like a good compromise between removing enough narrow pixel strips to convergence. This fixes e.g. https://i.imgur.com/dz4ANz1.png
+            this.removeFacetsSmallerThanNrOfPoints = constants_1.FACET_THRESHOLDS.MIN_FACET_SIZE;
             this.removeFacetsFromLargeToSmall = true;
-            this.maximumNumberOfFacets = Number.MAX_VALUE;
-            this.nrOfTimesToHalveBorderSegments = 2;
+            this.maximumNumberOfFacets = constants_1.FACET_THRESHOLDS.MAX_FACET_COUNT;
+            this.nrOfTimesToHalveBorderSegments = constants_1.SEGMENTATION_CONSTANTS.DEFAULT_HALVE_ITERATIONS;
             this.resizeImageIfTooLarge = true;
-            this.resizeImageWidth = 1024;
-            this.resizeImageHeight = 1024;
+            this.resizeImageWidth = constants_1.IMAGE_CONSTANTS.DEFAULT_RESIZE_WIDTH;
+            this.resizeImageHeight = constants_1.IMAGE_CONSTANTS.DEFAULT_RESIZE_HEIGHT;
             this.randomSeed = new Date().getTime();
         }
     }
@@ -298,6 +638,7 @@ define("settings", ["require", "exports"], function (require, exports) {
 define("structs/typedarrays", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.BooleanArray2D = exports.Uint8Array2D = exports.Uint32Array2D = void 0;
     class Uint32Array2D {
         constructor(width, height) {
             this.width = width;
@@ -348,9 +689,10 @@ define("structs/typedarrays", ["require", "exports"], function (require, exports
     }
     exports.BooleanArray2D = BooleanArray2D;
 });
-define("colorreductionmanagement", ["require", "exports", "common", "lib/clustering", "lib/colorconversion", "settings", "structs/typedarrays", "random"], function (require, exports, common_1, clustering_1, colorconversion_1, settings_1, typedarrays_1, random_1) {
+define("colorreductionmanagement", ["require", "exports", "common", "lib/clustering", "lib/colorconversion", "settings", "structs/typedarrays", "random", "lib/constants"], function (require, exports, common_1, clustering_1, colorconversion_1, settings_2, typedarrays_1, random_1, constants_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.ColorReducer = exports.ColorMapResult = void 0;
     class ColorMapResult {
     }
     exports.ColorMapResult = ColorMapResult;
@@ -395,12 +737,12 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
          *  Applies K-means clustering on the imgData to reduce the colors to
          *  k clusters and then output the result to the given outputImgData
          */
-        static applyKMeansClustering(imgData, outputImgData, ctx, settings, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
+        static applyKMeansClustering(imgData_1, outputImgData_1, ctx_1, settings_3) {
+            return __awaiter(this, arguments, void 0, function* (imgData, outputImgData, ctx, settings, onUpdate = null) {
                 const vectors = [];
                 let idx = 0;
                 let vIdx = 0;
-                const bitsToChopOff = 2; // r,g,b gets rounded to every 4 values, 0,4,8,...
+                const bitsToChopOff = constants_2.BIT_CONSTANTS.BITS_TO_CHOP_OFF; // r,g,b gets rounded to every 4 values, 0,4,8,...
                 // group by color, add points as 1D index to prevent Point object allocation
                 const pointsByColor = {};
                 for (let j = 0; j < imgData.height; j++) {
@@ -427,14 +769,14 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     const rgb = color.split(",").map((v) => parseInt(v));
                     // determine vector data based on color space conversion
                     let data;
-                    if (settings.kMeansClusteringColorSpace === settings_1.ClusteringColorSpace.RGB) {
+                    if (settings.kMeansClusteringColorSpace === settings_2.ClusteringColorSpace.RGB) {
                         data = rgb;
                     }
-                    else if (settings.kMeansClusteringColorSpace === settings_1.ClusteringColorSpace.HSL) {
-                        data = colorconversion_1.rgbToHsl(rgb[0], rgb[1], rgb[2]);
+                    else if (settings.kMeansClusteringColorSpace === settings_2.ClusteringColorSpace.HSL) {
+                        data = (0, colorconversion_1.rgbToHsl)(rgb[0], rgb[1], rgb[2]);
                     }
-                    else if (settings.kMeansClusteringColorSpace === settings_1.ClusteringColorSpace.LAB) {
-                        data = colorconversion_1.rgb2lab(rgb);
+                    else if (settings.kMeansClusteringColorSpace === settings_2.ClusteringColorSpace.LAB) {
+                        data = (0, colorconversion_1.rgb2lab)(rgb);
                     }
                     else {
                         data = rgb;
@@ -445,17 +787,17 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     vec.tag = rgb;
                     vectors[vIdx++] = vec;
                 }
-                const random = new random_1.Random(settings.randomSeed);
+                const random = new random_1.Random(settings.randomSeed === constants_2.RANDOM_SEED_CONSTANTS.USE_CURRENT_TIME ? new Date().getTime() : settings.randomSeed);
                 // vectors of all the unique colors are built, time to cluster them
                 const kmeans = new clustering_1.KMeans(vectors, settings.kMeansNrOfClusters, random);
                 let curTime = new Date().getTime();
                 kmeans.step();
                 while (kmeans.currentDeltaDistanceDifference > settings.kMeansMinDeltaDifference) {
                     kmeans.step();
-                    // update GUI every 500ms
-                    if (new Date().getTime() - curTime > 500) {
+                    // update GUI at regular intervals
+                    if (new Date().getTime() - curTime > constants_2.UPDATE_INTERVALS.PROGRESS_UPDATE_MS) {
                         curTime = new Date().getTime();
-                        yield common_1.delay(0);
+                        yield (0, common_1.delay)(0);
                         if (onUpdate != null) {
                             ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, false);
                             onUpdate(kmeans);
@@ -480,16 +822,16 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                 for (const v of kmeans.pointsPerCategory[c]) {
                     // determine the rgb color value of the cluster centroid
                     let rgb;
-                    if (settings.kMeansClusteringColorSpace === settings_1.ClusteringColorSpace.RGB) {
+                    if (settings.kMeansClusteringColorSpace === settings_2.ClusteringColorSpace.RGB) {
                         rgb = centroid.values;
                     }
-                    else if (settings.kMeansClusteringColorSpace === settings_1.ClusteringColorSpace.HSL) {
+                    else if (settings.kMeansClusteringColorSpace === settings_2.ClusteringColorSpace.HSL) {
                         const hsl = centroid.values;
-                        rgb = colorconversion_1.hslToRgb(hsl[0], hsl[1], hsl[2]);
+                        rgb = (0, colorconversion_1.hslToRgb)(hsl[0], hsl[1], hsl[2]);
                     }
-                    else if (settings.kMeansClusteringColorSpace === settings_1.ClusteringColorSpace.LAB) {
+                    else if (settings.kMeansClusteringColorSpace === settings_2.ClusteringColorSpace.LAB) {
                         const lab = centroid.values;
-                        rgb = colorconversion_1.lab2rgb(lab);
+                        rgb = (0, colorconversion_1.lab2rgb)(lab);
                     }
                     else {
                         rgb = centroid.values;
@@ -503,13 +845,13 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                             let closestRestrictedColor = null;
                             for (const color of settings.kMeansColorRestrictions) {
                                 // RGB distance is not very good for the human eye perception, convert both to lab and then calculate the distance
-                                const centroidLab = colorconversion_1.rgb2lab(rgb);
+                                const centroidLab = (0, colorconversion_1.rgb2lab)(rgb);
                                 let restrictionLab;
                                 if (typeof color === "string") {
-                                    restrictionLab = colorconversion_1.rgb2lab(settings.colorAliases[color]);
+                                    restrictionLab = (0, colorconversion_1.rgb2lab)(settings.colorAliases[color]);
                                 }
                                 else {
-                                    restrictionLab = colorconversion_1.rgb2lab(color);
+                                    restrictionLab = (0, colorconversion_1.rgb2lab)(color);
                                 }
                                 const distance = Math.sqrt((centroidLab[0] - restrictionLab[0]) * (centroidLab[0] - restrictionLab[0]) +
                                     (centroidLab[1] - restrictionLab[1]) * (centroidLab[1] - restrictionLab[1]) +
@@ -606,6 +948,7 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
 define("structs/point", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Point = void 0;
     class Point {
         constructor(x, y) {
             this.x = x;
@@ -629,6 +972,7 @@ define("structs/point", ["require", "exports"], function (require, exports) {
 define("structs/boundingbox", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.BoundingBox = void 0;
     class BoundingBox {
         constructor() {
             this.minX = Number.MAX_VALUE;
@@ -648,13 +992,14 @@ define("structs/boundingbox", ["require", "exports"], function (require, exports
 define("facetmanagement", ["require", "exports", "structs/point"], function (require, exports, point_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FacetResult = exports.Facet = exports.PathPoint = exports.OrientationEnum = void 0;
     var OrientationEnum;
     (function (OrientationEnum) {
         OrientationEnum[OrientationEnum["Left"] = 0] = "Left";
         OrientationEnum[OrientationEnum["Top"] = 1] = "Top";
         OrientationEnum[OrientationEnum["Right"] = 2] = "Right";
         OrientationEnum[OrientationEnum["Bottom"] = 3] = "Bottom";
-    })(OrientationEnum = exports.OrientationEnum || (exports.OrientationEnum = {}));
+    })(OrientationEnum || (exports.OrientationEnum = OrientationEnum = {}));
     /**
      * PathPoint is a point with an orientation that indicates which wall border is set
      */
@@ -767,9 +1112,10 @@ define("facetmanagement", ["require", "exports", "structs/point"], function (req
     }
     exports.FacetResult = FacetResult;
 });
-define("facetBorderSegmenter", ["require", "exports", "common", "structs/point", "facetmanagement"], function (require, exports, common_2, point_2, facetmanagement_1) {
+define("facetBorderSegmenter", ["require", "exports", "common", "structs/point", "facetmanagement", "lib/constants"], function (require, exports, common_2, point_2, facetmanagement_1, constants_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FacetBorderSegmenter = exports.FacetBoundarySegment = exports.PathSegment = void 0;
     /**
      *  Path segment is a segment of a border path that is adjacent to a specific neighbour facet
      */
@@ -800,8 +1146,8 @@ define("facetBorderSegmenter", ["require", "exports", "common", "structs/point",
          *  While border paths are all nice and fancy, they are not linked to neighbour facets
          *  So any change in the paths makes a not so nice gap between the facets, which makes smoothing them out impossible
          */
-        static buildFacetBorderSegments(facetResult, nrOfTimesToHalvePoints = 2, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
+        static buildFacetBorderSegments(facetResult_1) {
+            return __awaiter(this, arguments, void 0, function* (facetResult, nrOfTimesToHalvePoints = constants_3.SEGMENTATION_CONSTANTS.DEFAULT_HALVE_ITERATIONS, onUpdate = null) {
                 // first chop up the border path in segments each time the neighbour at that point changes
                 // (and sometimes even when it doesn't on that side but does on the neighbour's side)
                 const segmentsPerFacet = FacetBorderSegmenter.prepareSegmentsPerFacet(facetResult);
@@ -934,7 +1280,7 @@ define("facetBorderSegmenter", ["require", "exports", "common", "structs/point",
          *  because they are unneeded.
          */
         static reduceSegmentHaarWavelet(newpath, skipOutsideBorders, width, height) {
-            if (newpath.length <= 5) {
+            if (newpath.length <= constants_3.FACET_THRESHOLDS.MIN_PATH_LENGTH_FOR_REDUCTION) {
                 return newpath;
             }
             const reducedPath = [];
@@ -974,10 +1320,10 @@ define("facetBorderSegmenter", ["require", "exports", "common", "structs/point",
          *  A segment matches when the start and end match or the start matches with the end and vice versa
          *  (then the segment will need to be traversed in reverse order)
          */
-        static matchSegmentsWithNeighbours(facetResult, segmentsPerFacet, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
+        static matchSegmentsWithNeighbours(facetResult_1, segmentsPerFacet_1) {
+            return __awaiter(this, arguments, void 0, function* (facetResult, segmentsPerFacet, onUpdate = null) {
                 // max distance of the start/end points of the segment that it can be before the segments don't match up
-                const MAX_DISTANCE = 4;
+                const MAX_DISTANCE = constants_3.SEGMENTATION_CONSTANTS.MAX_SEGMENT_MATCH_DISTANCE;
                 // reserve room
                 for (const f of facetResult.facets) {
                     if (f != null) {
@@ -1071,8 +1417,8 @@ define("facetBorderSegmenter", ["require", "exports", "common", "structs/point",
                             // clear the current segment so it can't be processed again when processing the neighbour facet
                             segmentsPerFacet[f.id][s] = null;
                         }
-                        if (count % 100 === 0) {
-                            yield common_2.delay(0);
+                        if (count % constants_3.UPDATE_INTERVALS.BATCH_UPDATE_FREQUENCY === 0) {
+                            yield (0, common_2.delay)(0);
                             if (onUpdate != null) {
                                 onUpdate(f.id / facetResult.facets.length);
                             }
@@ -1088,16 +1434,241 @@ define("facetBorderSegmenter", ["require", "exports", "common", "structs/point",
     }
     exports.FacetBorderSegmenter = FacetBorderSegmenter;
 });
-define("facetBorderTracer", ["require", "exports", "common", "structs/point", "structs/typedarrays", "facetmanagement"], function (require, exports, common_3, point_3, typedarrays_2, facetmanagement_2) {
+/**
+ * Boundary checking and validation utilities
+ *
+ * This module provides reusable functions for checking if points are within image boundaries,
+ * clamping values, and getting neighbors. These utilities eliminate duplicated boundary
+ * checking logic throughout the codebase.
+ *
+ * @module boundaryUtils
+ */
+define("lib/boundaryUtils", ["require", "exports", "structs/point"], function (require, exports, point_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.EdgeType = void 0;
+    exports.isInBounds = isInBounds;
+    exports.clamp = clamp;
+    exports.clampPoint = clampPoint;
+    exports.getNeighbors4 = getNeighbors4;
+    exports.getNeighbors8 = getNeighbors8;
+    exports.isOnEdge = isOnEdge;
+    exports.getEdgeType = getEdgeType;
+    /**
+     * Edge type flags for identifying which edge(s) a point is on
+     * Can be combined using bitwise OR for corners
+     */
+    var EdgeType;
+    (function (EdgeType) {
+        /** Point is not on any edge */
+        EdgeType[EdgeType["None"] = 0] = "None";
+        /** Point is on left edge (x = 0) */
+        EdgeType[EdgeType["Left"] = 1] = "Left";
+        /** Point is on right edge (x = width - 1) */
+        EdgeType[EdgeType["Right"] = 2] = "Right";
+        /** Point is on top edge (y = 0) */
+        EdgeType[EdgeType["Top"] = 4] = "Top";
+        /** Point is on bottom edge (y = height - 1) */
+        EdgeType[EdgeType["Bottom"] = 8] = "Bottom";
+    })(EdgeType || (exports.EdgeType = EdgeType = {}));
+    /**
+     * Check if a point is within image boundaries
+     *
+     * @param x - X coordinate to check
+     * @param y - Y coordinate to check
+     * @param width - Image width (exclusive upper bound)
+     * @param height - Image height (exclusive upper bound)
+     * @returns true if point is within bounds [0, width) × [0, height)
+     *
+     * @example
+     * ```typescript
+     * if (isInBounds(x, y, image.width, image.height)) {
+     *   // Safe to access pixel at (x, y)
+     *   const pixel = imageData[y * width + x];
+     * }
+     * ```
+     */
+    function isInBounds(x, y, width, height) {
+        return x >= 0 && x < width && y >= 0 && y < height;
+    }
+    /**
+     * Clamp a value to a range [min, max]
+     *
+     * @param value - Value to clamp
+     * @param min - Minimum value (inclusive)
+     * @param max - Maximum value (inclusive)
+     * @returns Clamped value within [min, max]
+     *
+     * @example
+     * ```typescript
+     * const x = clamp(-5, 0, 10);  // Returns 0
+     * const y = clamp(15, 0, 10);  // Returns 10
+     * const z = clamp(5, 0, 10);   // Returns 5
+     * ```
+     */
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(value, max));
+    }
+    /**
+     * Clamp a point to image boundaries
+     *
+     * @param point - Point to clamp
+     * @param width - Image width
+     * @param height - Image height
+     * @returns New point with coordinates clamped to [0, width-1] × [0, height-1]
+     *
+     * @example
+     * ```typescript
+     * const clamped = clampPoint({ x: -5, y: 100 }, 50, 50);
+     * // Returns { x: 0, y: 49 }
+     * ```
+     */
+    function clampPoint(point, width, height) {
+        return new point_3.Point(clamp(point.x, 0, width - 1), clamp(point.y, 0, height - 1));
+    }
+    /**
+     * Get 4-connected neighbors (up, down, left, right)
+     * Only returns neighbors that are within image boundaries
+     *
+     * @param x - X coordinate of center point
+     * @param y - Y coordinate of center point
+     * @param width - Image width
+     * @param height - Image height
+     * @returns Array of valid neighbor points (2-4 neighbors depending on position)
+     *
+     * @example
+     * ```typescript
+     * // Center point returns 4 neighbors
+     * const neighbors = getNeighbors4(5, 5, 10, 10);
+     * // Returns [{x:5, y:4}, {x:5, y:6}, {x:4, y:5}, {x:6, y:5}]
+     *
+     * // Corner returns 2 neighbors
+     * const corner = getNeighbors4(0, 0, 10, 10);
+     * // Returns [{x:1, y:0}, {x:0, y:1}]
+     * ```
+     */
+    function getNeighbors4(x, y, width, height) {
+        const neighbors = [];
+        // Up
+        if (y > 0)
+            neighbors.push(new point_3.Point(x, y - 1));
+        // Down
+        if (y < height - 1)
+            neighbors.push(new point_3.Point(x, y + 1));
+        // Left
+        if (x > 0)
+            neighbors.push(new point_3.Point(x - 1, y));
+        // Right
+        if (x < width - 1)
+            neighbors.push(new point_3.Point(x + 1, y));
+        return neighbors;
+    }
+    /**
+     * Get 8-connected neighbors (includes diagonals)
+     * Only returns neighbors that are within image boundaries
+     *
+     * @param x - X coordinate of center point
+     * @param y - Y coordinate of center point
+     * @param width - Image width
+     * @param height - Image height
+     * @returns Array of valid neighbor points (3-8 neighbors depending on position)
+     *
+     * @example
+     * ```typescript
+     * // Center point returns 8 neighbors
+     * const neighbors = getNeighbors8(5, 5, 10, 10);
+     * // Returns all 8 surrounding points
+     *
+     * // Corner returns 3 neighbors
+     * const corner = getNeighbors8(0, 0, 10, 10);
+     * // Returns [{x:1,y:0}, {x:0,y:1}, {x:1,y:1}]
+     * ```
+     */
+    function getNeighbors8(x, y, width, height) {
+        const neighbors = [];
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                if (dx === 0 && dy === 0)
+                    continue; // Skip center point
+                const nx = x + dx;
+                const ny = y + dy;
+                if (isInBounds(nx, ny, width, height)) {
+                    neighbors.push(new point_3.Point(nx, ny));
+                }
+            }
+        }
+        return neighbors;
+    }
+    /**
+     * Check if a point is on any edge of the image
+     *
+     * @param x - X coordinate to check
+     * @param y - Y coordinate to check
+     * @param width - Image width
+     * @param height - Image height
+     * @returns true if point is on left, right, top, or bottom edge
+     *
+     * @example
+     * ```typescript
+     * isOnEdge(0, 5, 10, 10);    // true (left edge)
+     * isOnEdge(9, 5, 10, 10);    // true (right edge)
+     * isOnEdge(5, 5, 10, 10);    // false (center)
+     * isOnEdge(0, 0, 10, 10);    // true (corner)
+     * ```
+     */
+    function isOnEdge(x, y, width, height) {
+        return x === 0 || x === width - 1 || y === 0 || y === height - 1;
+    }
+    /**
+     * Get which edge(s) a point is on
+     * Returns a bitmask that can be tested with bitwise AND
+     * Points on corners will have multiple flags set
+     *
+     * @param x - X coordinate to check
+     * @param y - Y coordinate to check
+     * @param width - Image width
+     * @param height - Image height
+     * @returns EdgeType bitmask indicating which edge(s) the point is on
+     *
+     * @example
+     * ```typescript
+     * const edge = getEdgeType(0, 0, 10, 10);
+     * if (edge & EdgeType.Left) {
+     *   console.log('On left edge');
+     * }
+     * if (edge & EdgeType.Top) {
+     *   console.log('On top edge');
+     * }
+     * // For corner (0,0), both conditions above are true
+     *
+     * const center = getEdgeType(5, 5, 10, 10);
+     * // Returns EdgeType.None (0)
+     * ```
+     */
+    function getEdgeType(x, y, width, height) {
+        let edge = EdgeType.None;
+        if (x === 0)
+            edge |= EdgeType.Left;
+        if (x === width - 1)
+            edge |= EdgeType.Right;
+        if (y === 0)
+            edge |= EdgeType.Top;
+        if (y === height - 1)
+            edge |= EdgeType.Bottom;
+        return edge;
+    }
+});
+define("facetBorderTracer", ["require", "exports", "common", "structs/point", "structs/typedarrays", "facetmanagement", "lib/boundaryUtils"], function (require, exports, common_3, point_4, typedarrays_2, facetmanagement_2, boundaryUtils_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FacetBorderTracer = void 0;
     class FacetBorderTracer {
         /**
          *  Traces the border path of the facet from the facet border points.
          *  Imagine placing walls around the outer side of the border points.
          */
-        static buildFacetBorderPaths(facetResult, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
+        static buildFacetBorderPaths(facetResult_1) {
+            return __awaiter(this, arguments, void 0, function* (facetResult, onUpdate = null) {
                 let count = 0;
                 const borderMask = new typedarrays_2.BooleanArray2D(facetResult.width, facetResult.height);
                 // sort by biggest facets first
@@ -1132,23 +1703,23 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         // determine the starting point orientation (the outside of facet)
                         const pt = new facetmanagement_2.PathPoint(f.borderPoints[borderStartIndex], facetmanagement_2.OrientationEnum.Left);
                         // L T R B
-                        if (pt.x - 1 < 0 || facetResult.facetMap.get(pt.x - 1, pt.y) !== f.id) {
+                        if (!(0, boundaryUtils_1.isInBounds)(pt.x - 1, pt.y, facetResult.width, facetResult.height) || facetResult.facetMap.get(pt.x - 1, pt.y) !== f.id) {
                             pt.orientation = facetmanagement_2.OrientationEnum.Left;
                         }
-                        else if (pt.y - 1 < 0 || facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id) {
+                        else if (!(0, boundaryUtils_1.isInBounds)(pt.x, pt.y - 1, facetResult.width, facetResult.height) || facetResult.facetMap.get(pt.x, pt.y - 1) !== f.id) {
                             pt.orientation = facetmanagement_2.OrientationEnum.Top;
                         }
-                        else if (pt.x + 1 >= facetResult.width || facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id) {
+                        else if (!(0, boundaryUtils_1.isInBounds)(pt.x + 1, pt.y, facetResult.width, facetResult.height) || facetResult.facetMap.get(pt.x + 1, pt.y) !== f.id) {
                             pt.orientation = facetmanagement_2.OrientationEnum.Right;
                         }
-                        else if (pt.y + 1 >= facetResult.height || facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id) {
+                        else if (!(0, boundaryUtils_1.isInBounds)(pt.x, pt.y + 1, facetResult.width, facetResult.height) || facetResult.facetMap.get(pt.x, pt.y + 1) !== f.id) {
                             pt.orientation = facetmanagement_2.OrientationEnum.Bottom;
                         }
                         // build a border path from that point
                         const path = FacetBorderTracer.getPath(pt, facetResult, f, borderMask, xWall, yWall);
                         f.borderPath = path;
                         if (count % 100 === 0) {
-                            yield common_3.delay(0);
+                            yield (0, common_3.delay)(0);
                             if (onUpdate != null) {
                                 onUpdate(fidx / facetProcessingOrder.length);
                             }
@@ -1198,7 +1769,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place top _ wall at x,y");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Top);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Top);
                         possibleNextPoints.push(nextpt);
                     }
                     // check rotate to bottom
@@ -1214,7 +1785,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place bottom _ wall at x,y");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Bottom);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Bottom);
                         possibleNextPoints.push(nextpt);
                     }
                     // check upwards
@@ -1232,7 +1803,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log(`can place left | wall at x,y-1`);
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y - 1), facetmanagement_2.OrientationEnum.Left);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y - 1), facetmanagement_2.OrientationEnum.Left);
                         possibleNextPoints.push(nextpt);
                     }
                     // check downwards
@@ -1250,7 +1821,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place left | wall at x,y+1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y + 1), facetmanagement_2.OrientationEnum.Left);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y + 1), facetmanagement_2.OrientationEnum.Left);
                         possibleNextPoints.push(nextpt);
                     }
                     // check left upwards
@@ -1269,7 +1840,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place bottom _ wall at x-1,y-1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x - 1, pt.y - 1), facetmanagement_2.OrientationEnum.Bottom);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x - 1, pt.y - 1), facetmanagement_2.OrientationEnum.Bottom);
                         possibleNextPoints.push(nextpt);
                     }
                     // check left downwards
@@ -1288,7 +1859,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place top _ wall at x-1,y+1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x - 1, pt.y + 1), facetmanagement_2.OrientationEnum.Top);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x - 1, pt.y + 1), facetmanagement_2.OrientationEnum.Top);
                         possibleNextPoints.push(nextpt);
                     }
                 }
@@ -1302,7 +1873,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place left | wall at x,y");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Left);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Left);
                         possibleNextPoints.push(nextpt);
                     }
                     // check rotate to right
@@ -1314,7 +1885,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place right | wall at x,y");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Right);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Right);
                         possibleNextPoints.push(nextpt);
                     }
                     // check leftwards
@@ -1327,7 +1898,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log(`can place top _ wall at x-1,y`);
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x - 1, pt.y), facetmanagement_2.OrientationEnum.Top);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x - 1, pt.y), facetmanagement_2.OrientationEnum.Top);
                         possibleNextPoints.push(nextpt);
                     }
                     // check rightwards
@@ -1340,7 +1911,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log(`can place top _ wall at x+1,y`);
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x + 1, pt.y), facetmanagement_2.OrientationEnum.Top);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x + 1, pt.y), facetmanagement_2.OrientationEnum.Top);
                         possibleNextPoints.push(nextpt);
                     }
                     // check left upwards
@@ -1354,7 +1925,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place right | wall at x-1,y-1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x - 1, pt.y - 1), facetmanagement_2.OrientationEnum.Right);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x - 1, pt.y - 1), facetmanagement_2.OrientationEnum.Right);
                         possibleNextPoints.push(nextpt);
                     }
                     // check right upwards
@@ -1368,7 +1939,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place left |  wall at x+1,y-1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x + 1, pt.y - 1), facetmanagement_2.OrientationEnum.Left);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x + 1, pt.y - 1), facetmanagement_2.OrientationEnum.Left);
                         possibleNextPoints.push(nextpt);
                     }
                 }
@@ -1382,7 +1953,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place top _ wall at x,y");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Top);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Top);
                         possibleNextPoints.push(nextpt);
                     }
                     // check rotate to bottom
@@ -1394,7 +1965,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place bottom _ wall at x,y");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Bottom);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Bottom);
                         possibleNextPoints.push(nextpt);
                     }
                     // check upwards
@@ -1407,7 +1978,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log(`can place right | wall at x,y-1`);
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y - 1), facetmanagement_2.OrientationEnum.Right);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y - 1), facetmanagement_2.OrientationEnum.Right);
                         possibleNextPoints.push(nextpt);
                     }
                     // check downwards
@@ -1420,7 +1991,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place right | wall at x,y+1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y + 1), facetmanagement_2.OrientationEnum.Right);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y + 1), facetmanagement_2.OrientationEnum.Right);
                         possibleNextPoints.push(nextpt);
                     }
                     // check right upwards
@@ -1434,7 +2005,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place bottom _ wall at x+1,y-1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x + 1, pt.y - 1), facetmanagement_2.OrientationEnum.Bottom);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x + 1, pt.y - 1), facetmanagement_2.OrientationEnum.Bottom);
                         possibleNextPoints.push(nextpt);
                     }
                     // check right downwards
@@ -1448,7 +2019,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place top _ wall at x+1,y+1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x + 1, pt.y + 1), facetmanagement_2.OrientationEnum.Top);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x + 1, pt.y + 1), facetmanagement_2.OrientationEnum.Top);
                         possibleNextPoints.push(nextpt);
                     }
                 }
@@ -1462,7 +2033,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place left | wall at x,y");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Left);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Left);
                         possibleNextPoints.push(nextpt);
                     }
                     // check rotate to right
@@ -1474,7 +2045,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place right | wall at x,y");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Right);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x, pt.y), facetmanagement_2.OrientationEnum.Right);
                         possibleNextPoints.push(nextpt);
                     }
                     // check leftwards
@@ -1487,7 +2058,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log(`can place bottom _ wall at x-1,y`);
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x - 1, pt.y), facetmanagement_2.OrientationEnum.Bottom);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x - 1, pt.y), facetmanagement_2.OrientationEnum.Bottom);
                         possibleNextPoints.push(nextpt);
                     }
                     // check rightwards
@@ -1500,7 +2071,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log(`can place bottom _ wall at x+1,y`);
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x + 1, pt.y), facetmanagement_2.OrientationEnum.Bottom);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x + 1, pt.y), facetmanagement_2.OrientationEnum.Bottom);
                         possibleNextPoints.push(nextpt);
                     }
                     // check left downwards
@@ -1514,7 +2085,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place right | wall at x-1,y+1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x - 1, pt.y + 1), facetmanagement_2.OrientationEnum.Right);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x - 1, pt.y + 1), facetmanagement_2.OrientationEnum.Right);
                         possibleNextPoints.push(nextpt);
                     }
                     // check right downwards
@@ -1528,7 +2099,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
                         if (debug) {
                             console.log("can place left |  wall at x+1,y+1");
                         }
-                        const nextpt = new facetmanagement_2.PathPoint(new point_3.Point(pt.x + 1, pt.y + 1), facetmanagement_2.OrientationEnum.Left);
+                        const nextpt = new facetmanagement_2.PathPoint(new point_4.Point(pt.x + 1, pt.y + 1), facetmanagement_2.OrientationEnum.Left);
                         possibleNextPoints.push(nextpt);
                     }
                 }
@@ -1593,6 +2164,7 @@ define("facetBorderTracer", ["require", "exports", "common", "structs/point", "s
 define("lib/fill", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.fill = fill;
     function fill(x, y, width, height, visited, setFill) {
         // at this point, we know array[y,x] is clear, and we want to move as far as possible to the upper-left. moving
         // up is much more important than moving left, so we could try to make this smarter by sometimes moving to
@@ -1614,7 +2186,6 @@ define("lib/fill", ["require", "exports"], function (require, exports) {
         }
         fillCore(xx, yy, width, height, visited, setFill);
     }
-    exports.fill = fill;
     function fillCore(x, y, width, height, visited, setFill) {
         // at this point, we know that array[y,x] is clear, and array[y-1,x] and array[y,x-1] are set.
         // we'll begin scanning down and to the right, attempting to fill an entire rectangular block
@@ -1677,16 +2248,252 @@ define("lib/fill", ["require", "exports"], function (require, exports) {
         } while (lastRowLength !== 0 && ++y < height); // if we get to a full row or to the bottom, we're done
     }
 });
-define("facetReducer", ["require", "exports", "colorreductionmanagement", "common", "facetCreator", "structs/typedarrays"], function (require, exports, colorreductionmanagement_1, common_4, facetCreator_1, typedarrays_3) {
+/**
+ * Facet building utilities
+ *
+ * Separates facet construction from region finding, making the code
+ * more modular and easier to test.
+ *
+ * @module FacetBuilder
+ */
+define("lib/FacetBuilder", ["require", "exports", "structs/point", "structs/boundingbox", "facetmanagement", "structs/typedarrays", "lib/fill"], function (require, exports, point_5, boundingbox_1, facetmanagement_3, typedarrays_3, fill_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FacetBuilder = void 0;
+    /**
+     * Builder class for creating facets from color-mapped images
+     *
+     * Provides a clean interface for facet creation that separates the concerns
+     * of region detection (flood fill) from facet object construction.
+     *
+     * @example
+     * ```typescript
+     * const builder = new FacetBuilder();
+     * const facet = builder.buildFacet(
+     *   0,           // facetIndex
+     *   5,           // colorIndex
+     *   10, 10,      // starting x, y
+     *   visited,     // visited mask
+     *   colorMap,    // color indices
+     *   facetResult  // result container
+     * );
+     * ```
+     */
+    class FacetBuilder {
+        /**
+         * Build a single facet starting from a given point
+         *
+         * Uses flood fill to find all connected pixels of the same color,
+         * then constructs a Facet object with:
+         * - Point count
+         * - Border points
+         * - Bounding box
+         * - Color index
+         *
+         * @param facetIndex - Unique index for this facet
+         * @param facetColorIndex - Color index this facet represents
+         * @param x - Starting x coordinate
+         * @param y - Starting y coordinate
+         * @param visited - 2D array tracking visited pixels
+         * @param imgColorIndices - 2D array of color indices
+         * @param facetResult - Result container to update
+         * @returns Newly created facet
+         *
+         * @example
+         * ```typescript
+         * const builder = new FacetBuilder();
+         * const visited = new BooleanArray2D(width, height);
+         * const facet = builder.buildFacet(
+         *   0, 5, 10, 10,
+         *   visited, colorMap, result
+         * );
+         * console.log(`Facet has ${facet.pointCount} pixels`);
+         * ```
+         */
+        buildFacet(facetIndex, facetColorIndex, x, y, visited, imgColorIndices, facetResult) {
+            const facet = new facetmanagement_3.Facet();
+            facet.id = facetIndex;
+            facet.color = facetColorIndex;
+            facet.bbox = new boundingbox_1.BoundingBox();
+            facet.borderPoints = [];
+            facet.neighbourFacetsIsDirty = true;
+            facet.neighbourFacets = null;
+            // Use optimized fill algorithm with callbacks
+            // This avoids allocating Point objects during the fill
+            (0, fill_1.fill)(x, y, facetResult.width, facetResult.height, (ptx, pty) => visited.get(ptx, pty) || imgColorIndices.get(ptx, pty) !== facetColorIndex, (ptx, pty) => {
+                // Mark as visited
+                visited.set(ptx, pty, true);
+                facetResult.facetMap.set(ptx, pty, facetIndex);
+                facet.pointCount++;
+                // Determine if this is a border point
+                // A point is a border point if any of its 4-neighbors has a different color
+                const isInnerPoint = imgColorIndices.matchAllAround(ptx, pty, facetColorIndex);
+                if (!isInnerPoint) {
+                    facet.borderPoints.push(new point_5.Point(ptx, pty));
+                }
+                // Update bounding box
+                if (ptx > facet.bbox.maxX) {
+                    facet.bbox.maxX = ptx;
+                }
+                if (pty > facet.bbox.maxY) {
+                    facet.bbox.maxY = pty;
+                }
+                if (ptx < facet.bbox.minX) {
+                    facet.bbox.minX = ptx;
+                }
+                if (pty < facet.bbox.minY) {
+                    facet.bbox.minY = pty;
+                }
+            });
+            return facet;
+        }
+        /**
+         * Build all facets from a color-mapped image
+         *
+         * Scans the entire image and creates a facet for each connected region
+         * of pixels with the same color.
+         *
+         * @param imgColorIndices - 2D array of color indices
+         * @param width - Image width
+         * @param height - Image height
+         * @param facetResult - Result container to populate
+         * @returns Array of created facets
+         *
+         * @example
+         * ```typescript
+         * const builder = new FacetBuilder();
+         * const result = new FacetResult();
+         * result.width = 100;
+         * result.height = 100;
+         * result.facetMap = new Uint32Array2D(100, 100);
+         * result.facets = [];
+         *
+         * const facets = builder.buildAllFacets(colorMap, 100, 100, result);
+         * console.log(`Created ${facets.length} facets`);
+         * ```
+         */
+        buildAllFacets(imgColorIndices, width, height, facetResult) {
+            const visited = new typedarrays_3.BooleanArray2D(width, height);
+            const facets = [];
+            for (let j = 0; j < height; j++) {
+                for (let i = 0; i < width; i++) {
+                    if (!visited.get(i, j)) {
+                        const colorIndex = imgColorIndices.get(i, j);
+                        const facetIndex = facets.length;
+                        const facet = this.buildFacet(facetIndex, colorIndex, i, j, visited, imgColorIndices, facetResult);
+                        facets.push(facet);
+                    }
+                }
+            }
+            return facets;
+        }
+        /**
+         * Calculate the bounding box of a set of points
+         *
+         * @param points - Array of points
+         * @returns Bounding box containing all points
+         *
+         * @example
+         * ```typescript
+         * const builder = new FacetBuilder();
+         * const points = [new Point(5, 10), new Point(15, 20), new Point(8, 12)];
+         * const bbox = builder.calculateBoundingBox(points);
+         * console.log(`Box: (${bbox.minX}, ${bbox.minY}) to (${bbox.maxX}, ${bbox.maxY})`);
+         * ```
+         */
+        calculateBoundingBox(points) {
+            if (points.length === 0) {
+                return new boundingbox_1.BoundingBox();
+            }
+            const bbox = new boundingbox_1.BoundingBox();
+            bbox.minX = Number.MAX_VALUE;
+            bbox.minY = Number.MAX_VALUE;
+            bbox.maxX = Number.MIN_VALUE;
+            bbox.maxY = Number.MIN_VALUE;
+            for (const pt of points) {
+                if (pt.x < bbox.minX) {
+                    bbox.minX = pt.x;
+                }
+                if (pt.x > bbox.maxX) {
+                    bbox.maxX = pt.x;
+                }
+                if (pt.y < bbox.minY) {
+                    bbox.minY = pt.y;
+                }
+                if (pt.y > bbox.maxY) {
+                    bbox.maxY = pt.y;
+                }
+            }
+            return bbox;
+        }
+        /**
+         * Identify border points within a set of points
+         *
+         * A point is considered a border point if any of its 4-neighbors
+         * (up, down, left, right) is not in the point set.
+         *
+         * @param points - Array of points in the region
+         * @param width - Width of the area
+         * @param height - Height of the area
+         * @returns Array of border points
+         *
+         * @example
+         * ```typescript
+         * const builder = new FacetBuilder();
+         * const region = [
+         *   new Point(5, 5), new Point(6, 5), new Point(7, 5),
+         *   new Point(5, 6), new Point(6, 6), new Point(7, 6),
+         * ];
+         * const border = builder.identifyBorderPoints(region, 100, 100);
+         * console.log(`${border.length} border points found`);
+         * ```
+         */
+        identifyBorderPoints(points, width, height) {
+            // Create a set for fast lookup
+            const pointSet = new Set();
+            for (const pt of points) {
+                pointSet.add(pt.y * width + pt.x);
+            }
+            const borderPoints = [];
+            for (const pt of points) {
+                let isBorder = false;
+                // Check 4-neighbors
+                if (pt.y > 0 && !pointSet.has((pt.y - 1) * width + pt.x)) {
+                    isBorder = true; // Top neighbor missing
+                }
+                else if (pt.y < height - 1 && !pointSet.has((pt.y + 1) * width + pt.x)) {
+                    isBorder = true; // Bottom neighbor missing
+                }
+                else if (pt.x > 0 && !pointSet.has(pt.y * width + (pt.x - 1))) {
+                    isBorder = true; // Left neighbor missing
+                }
+                else if (pt.x < width - 1 && !pointSet.has(pt.y * width + (pt.x + 1))) {
+                    isBorder = true; // Right neighbor missing
+                }
+                // Also check if at image boundary
+                if (pt.x === 0 || pt.x === width - 1 || pt.y === 0 || pt.y === height - 1) {
+                    isBorder = true;
+                }
+                if (isBorder) {
+                    borderPoints.push(pt);
+                }
+            }
+            return borderPoints;
+        }
+    }
+    exports.FacetBuilder = FacetBuilder;
+});
+define("facetReducer", ["require", "exports", "colorreductionmanagement", "common", "facetCreator", "structs/typedarrays", "lib/constants"], function (require, exports, colorreductionmanagement_1, common_4, facetCreator_1, typedarrays_4, constants_4) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FacetReducer = void 0;
     class FacetReducer {
         /**
          *  Remove all facets that have a pointCount smaller than the given number.
          */
-        static reduceFacets(smallerThan, removeFacetsFromLargeToSmall, maximumNumberOfFacets, colorsByIndex, facetResult, imgColorIndices, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
-                const visitedCache = new typedarrays_3.BooleanArray2D(facetResult.width, facetResult.height);
+        static reduceFacets(smallerThan_1, removeFacetsFromLargeToSmall_1, maximumNumberOfFacets_1, colorsByIndex_1, facetResult_1, imgColorIndices_1) {
+            return __awaiter(this, arguments, void 0, function* (smallerThan, removeFacetsFromLargeToSmall, maximumNumberOfFacets, colorsByIndex, facetResult, imgColorIndices, onUpdate = null) {
+                const visitedCache = new typedarrays_4.BooleanArray2D(facetResult.width, facetResult.height);
                 // build the color distance matrix, which describes the distance of each color to each other
                 const colorDistances = colorreductionmanagement_1.ColorReducer.buildColorDistanceMatrix(colorsByIndex);
                 // process facets from large to small. This results in better consistency with the original image
@@ -1703,9 +2510,9 @@ define("facetReducer", ["require", "exports", "colorreductionmanagement", "commo
                     // facets can be removed by merging by others due to a previous facet deletion
                     if (f != null && f.pointCount < smallerThan) {
                         FacetReducer.deleteFacet(f.id, facetResult, imgColorIndices, colorDistances, visitedCache);
-                        if (new Date().getTime() - curTime > 500) {
+                        if (new Date().getTime() - curTime > constants_4.UPDATE_INTERVALS.PROGRESS_UPDATE_MS) {
                             curTime = new Date().getTime();
-                            yield common_4.delay(0);
+                            yield (0, common_4.delay)(0);
                             if (onUpdate != null) {
                                 onUpdate(0.5 * fidx / facetProcessingOrder.length);
                             }
@@ -1727,9 +2534,9 @@ define("facetReducer", ["require", "exports", "colorreductionmanagement", "commo
                     const facetToRemove = facetResult.facets[facetProcessingOrder[0]];
                     FacetReducer.deleteFacet(facetToRemove.id, facetResult, imgColorIndices, colorDistances, visitedCache);
                     facetCount = facetResult.facets.filter(f => f != null).length;
-                    if (new Date().getTime() - curTime > 500) {
+                    if (new Date().getTime() - curTime > constants_4.UPDATE_INTERVALS.PROGRESS_UPDATE_MS) {
                         curTime = new Date().getTime();
-                        yield common_4.delay(0);
+                        yield (0, common_4.delay)(0);
                         if (onUpdate != null) {
                             onUpdate(0.5 + 0.5 - (facetCount - maximumNumberOfFacets) / (startFacetCount - maximumNumberOfFacets));
                         }
@@ -1967,22 +2774,23 @@ define("facetReducer", ["require", "exports", "colorreductionmanagement", "commo
     }
     exports.FacetReducer = FacetReducer;
 });
-define("facetCreator", ["require", "exports", "common", "lib/fill", "structs/boundingbox", "structs/point", "structs/typedarrays", "facetmanagement"], function (require, exports, common_5, fill_1, boundingbox_1, point_4, typedarrays_4, facetmanagement_3) {
+define("facetCreator", ["require", "exports", "common", "lib/boundaryUtils", "lib/FacetBuilder", "structs/typedarrays", "facetmanagement"], function (require, exports, common_5, boundaryUtils_2, FacetBuilder_1, typedarrays_5, facetmanagement_4) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FacetCreator = void 0;
     class FacetCreator {
         /**
          *  Constructs the facets with its border points for each area of pixels of the same color
          */
-        static getFacets(width, height, imgColorIndices, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
-                const result = new facetmanagement_3.FacetResult();
+        static getFacets(width_1, height_1, imgColorIndices_1) {
+            return __awaiter(this, arguments, void 0, function* (width, height, imgColorIndices, onUpdate = null) {
+                const result = new facetmanagement_4.FacetResult();
                 result.width = width;
                 result.height = height;
                 // setup visited mask
-                const visited = new typedarrays_4.BooleanArray2D(result.width, result.height);
+                const visited = new typedarrays_5.BooleanArray2D(result.width, result.height);
                 // setup facet map & array
-                result.facetMap = new typedarrays_4.Uint32Array2D(result.width, result.height);
+                result.facetMap = new typedarrays_5.Uint32Array2D(result.width, result.height);
                 result.facets = [];
                 // depth first traversal to find the different facets
                 let count = 0;
@@ -1991,11 +2799,11 @@ define("facetCreator", ["require", "exports", "common", "lib/fill", "structs/bou
                         const colorIndex = imgColorIndices.get(i, j);
                         if (!visited.get(i, j)) {
                             const facetIndex = result.facets.length;
-                            // build a facet starting at point i,j
-                            const facet = FacetCreator.buildFacet(facetIndex, colorIndex, i, j, visited, imgColorIndices, result);
+                            // build a facet starting at point i,j using FacetBuilder
+                            const facet = FacetCreator.builder.buildFacet(facetIndex, colorIndex, i, j, visited, imgColorIndices, result);
                             result.facets.push(facet);
                             if (count % 100 === 0) {
-                                yield common_5.delay(0);
+                                yield (0, common_5.delay)(0);
                                 if (onUpdate != null) {
                                     onUpdate(count / (result.width * result.height));
                                 }
@@ -2004,7 +2812,7 @@ define("facetCreator", ["require", "exports", "common", "lib/fill", "structs/bou
                         count++;
                     }
                 }
-                yield common_5.delay(0);
+                yield (0, common_5.delay)(0);
                 // fill in the neighbours of all facets by checking the neighbours of the border points
                 for (const f of result.facets) {
                     if (f != null) {
@@ -2019,90 +2827,10 @@ define("facetCreator", ["require", "exports", "common", "lib/fill", "structs/bou
         }
         /**
          *  Builds a facet at given x,y using depth first search to visit all pixels of the same color
+         *  @deprecated Use FacetBuilder.buildFacet() instead. Kept for backward compatibility.
          */
         static buildFacet(facetIndex, facetColorIndex, x, y, visited, imgColorIndices, facetResult) {
-            const facet = new facetmanagement_3.Facet();
-            facet.id = facetIndex;
-            facet.color = facetColorIndex;
-            facet.bbox = new boundingbox_1.BoundingBox();
-            facet.borderPoints = [];
-            facet.neighbourFacetsIsDirty = true; // not built neighbours yet
-            facet.neighbourFacets = null;
-            fill_1.fill(x, y, facetResult.width, facetResult.height, (ptx, pty) => visited.get(ptx, pty) || imgColorIndices.get(ptx, pty) !== facetColorIndex, (ptx, pty) => {
-                visited.set(ptx, pty, true);
-                facetResult.facetMap.set(ptx, pty, facetIndex);
-                facet.pointCount++;
-                // determine if the point is a border or not
-                /*  const isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) === facetColorIndex) &&
-                      (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) === facetColorIndex) &&
-                      (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) === facetColorIndex) &&
-                      (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) === facetColorIndex);
-                */
-                const isInnerPoint = imgColorIndices.matchAllAround(ptx, pty, facetColorIndex);
-                if (!isInnerPoint) {
-                    facet.borderPoints.push(new point_4.Point(ptx, pty));
-                }
-                // update bounding box of facet
-                if (ptx > facet.bbox.maxX) {
-                    facet.bbox.maxX = ptx;
-                }
-                if (pty > facet.bbox.maxY) {
-                    facet.bbox.maxY = pty;
-                }
-                if (ptx < facet.bbox.minX) {
-                    facet.bbox.minX = ptx;
-                }
-                if (pty < facet.bbox.minY) {
-                    facet.bbox.minY = pty;
-                }
-            });
-            /*
-               // using a 1D flattened stack (x*width+y), we can avoid heap allocations of Point objects, which halves the garbage collection time
-             let stack: number[] = [];
-             stack.push(y * facetResult.width + x);
-    
-             while (stack.length > 0) {
-                 let pt = stack.pop()!;
-                 let ptx = pt % facetResult.width;
-                 let pty = Math.floor(pt / facetResult.width);
-    
-                 // if the point wasn't visited before and matches
-                 // the same color
-                 if (!visited.get(ptx, pty) &&
-                     imgColorIndices.get(ptx, pty) == facetColorIndex) {
-    
-                     visited.set(ptx, pty, true);
-                     facetResult.facetMap.set(ptx, pty, facetIndex);
-                     facet.pointCount++;
-    
-                     // determine if the point is a border or not
-                     let isInnerPoint = (ptx - 1 >= 0 && imgColorIndices.get(ptx - 1, pty) == facetColorIndex) &&
-                         (pty - 1 >= 0 && imgColorIndices.get(ptx, pty - 1) == facetColorIndex) &&
-                         (ptx + 1 < facetResult.width && imgColorIndices.get(ptx + 1, pty) == facetColorIndex) &&
-                         (pty + 1 < facetResult.height && imgColorIndices.get(ptx, pty + 1) == facetColorIndex);
-    
-                     if (!isInnerPoint)
-                         facet.borderPoints.push(new Point(ptx, pty));
-    
-                     // update bounding box of facet
-                     if (ptx > facet.bbox.maxX) facet.bbox.maxX = ptx;
-                     if (pty > facet.bbox.maxY) facet.bbox.maxY = pty;
-                     if (ptx < facet.bbox.minX) facet.bbox.minX = ptx;
-                     if (pty < facet.bbox.minY) facet.bbox.minY = pty;
-    
-                     // visit direct adjacent points
-                     if (ptx - 1 >= 0 && !visited.get(ptx - 1, pty))
-                         stack.push(pty * facetResult.width + (ptx - 1)); //stack.push(new Point(pt.x - 1, pt.y));
-                     if (pty - 1 >= 0 && !visited.get(ptx, pty - 1))
-                         stack.push((pty - 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y - 1));
-                     if (ptx + 1 < facetResult.width && !visited.get(ptx + 1, pty))
-                         stack.push(pty * facetResult.width + (ptx + 1));//stack.push(new Point(pt.x + 1, pt.y));
-                     if (pty + 1 < facetResult.height && !visited.get(ptx, pty + 1))
-                         stack.push((pty + 1) * facetResult.width + ptx); //stack.push(new Point(pt.x, pt.y + 1));
-                 }
-             }
-             */
-            return facet;
+            return FacetCreator.builder.buildFacet(facetIndex, facetColorIndex, x, y, visited, imgColorIndices, facetResult);
         }
         /**
          * Check which neighbour facets the given facet has by checking the neighbour facets at each border point
@@ -2111,28 +2839,12 @@ define("facetCreator", ["require", "exports", "common", "lib/fill", "structs/bou
             facet.neighbourFacets = [];
             const uniqueFacets = {}; // poor man's set
             for (const pt of facet.borderPoints) {
-                if (pt.x - 1 >= 0) {
-                    const leftFacetId = facetResult.facetMap.get(pt.x - 1, pt.y);
-                    if (leftFacetId !== facet.id) {
-                        uniqueFacets[leftFacetId] = true;
-                    }
-                }
-                if (pt.y - 1 >= 0) {
-                    const topFacetId = facetResult.facetMap.get(pt.x, pt.y - 1);
-                    if (topFacetId !== facet.id) {
-                        uniqueFacets[topFacetId] = true;
-                    }
-                }
-                if (pt.x + 1 < facetResult.width) {
-                    const rightFacetId = facetResult.facetMap.get(pt.x + 1, pt.y);
-                    if (rightFacetId !== facet.id) {
-                        uniqueFacets[rightFacetId] = true;
-                    }
-                }
-                if (pt.y + 1 < facetResult.height) {
-                    const bottomFacetId = facetResult.facetMap.get(pt.x, pt.y + 1);
-                    if (bottomFacetId !== facet.id) {
-                        uniqueFacets[bottomFacetId] = true;
+                // Get all 4-connected neighbors within bounds
+                const neighbors = (0, boundaryUtils_2.getNeighbors4)(pt.x, pt.y, facetResult.width, facetResult.height);
+                for (const neighbor of neighbors) {
+                    const neighborFacetId = facetResult.facetMap.get(neighbor.x, neighbor.y);
+                    if (neighborFacetId !== facet.id) {
+                        uniqueFacets[neighborFacetId] = true;
                     }
                 }
             }
@@ -2146,10 +2858,12 @@ define("facetCreator", ["require", "exports", "common", "lib/fill", "structs/bou
         }
     }
     exports.FacetCreator = FacetCreator;
+    FacetCreator.builder = new FacetBuilder_1.FacetBuilder();
 });
 define("lib/datastructs", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.PriorityQueue = exports.Map = void 0;
     class Map {
         constructor() {
             this.obj = {};
@@ -2401,6 +3115,8 @@ define("lib/datastructs", ["require", "exports"], function (require, exports) {
 define("lib/polylabel", ["require", "exports", "lib/datastructs"], function (require, exports, datastructs_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.polylabel = polylabel;
+    exports.pointToPolygonDist = pointToPolygonDist;
     function polylabel(polygon, precision = 1.0) {
         // find the bounding box of the outer ring
         let minX = Number.MAX_VALUE;
@@ -2466,7 +3182,6 @@ define("lib/polylabel", ["require", "exports", "lib/datastructs"], function (req
         }
         return { pt: { x: bestCell.x, y: bestCell.y }, distance: bestCell.d };
     }
-    exports.polylabel = polylabel;
     class Cell {
         constructor(x, y, h, polygon) {
             this.x = x;
@@ -2523,7 +3238,6 @@ define("lib/polylabel", ["require", "exports", "lib/datastructs"], function (req
         }
         return (inside ? 1 : -1) * Math.sqrt(minDistSq);
     }
-    exports.pointToPolygonDist = pointToPolygonDist;
     // get polygon centroid
     function getCentroidCell(polygon) {
         let area = 0;
@@ -2547,6 +3261,7 @@ define("lib/polylabel", ["require", "exports", "lib/datastructs"], function (req
 define("facetLabelPlacer", ["require", "exports", "common", "lib/polylabel", "structs/boundingbox", "facetCreator"], function (require, exports, common_6, polylabel_1, boundingbox_2, facetCreator_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FacetLabelPlacer = void 0;
     class FacetLabelPlacer {
         /**
          *  Determines where to place the labels for each facet. This is done by calculating where
@@ -2556,8 +3271,8 @@ define("facetLabelPlacer", ["require", "exports", "common", "lib/polylabel", "st
          *  if only the outer border of the facet is taken in account. This is solved by adding the neighbours facet polygon that fall
          *  within the facet as additional polygon rings (why does everything look so easy to do yet never is under the hood :/)
          */
-        static buildFacetLabelBounds(facetResult, onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
+        static buildFacetLabelBounds(facetResult_1) {
+            return __awaiter(this, arguments, void 0, function* (facetResult, onUpdate = null) {
                 let count = 0;
                 for (const f of facetResult.facets) {
                     if (f != null) {
@@ -2580,7 +3295,7 @@ define("facetLabelPlacer", ["require", "exports", "common", "lib/polylabel", "st
                                 polyRings.push(neighbourPath);
                             }
                         }
-                        const result = polylabel_1.polylabel(polyRings);
+                        const result = (0, polylabel_1.polylabel)(polyRings);
                         f.labelBounds = new boundingbox_2.BoundingBox();
                         // determine inner square within the circle
                         const innerPadding = 2 * Math.sqrt(2 * result.distance);
@@ -2589,7 +3304,7 @@ define("facetLabelPlacer", ["require", "exports", "common", "lib/polylabel", "st
                         f.labelBounds.minY = result.pt.y - innerPadding;
                         f.labelBounds.maxY = result.pt.y + innerPadding;
                         if (count % 100 === 0) {
-                            yield common_6.delay(0);
+                            yield (0, common_6.delay)(0);
                             if (onUpdate != null) {
                                 onUpdate(f.id / facetResult.facets.length);
                             }
@@ -2620,7 +3335,7 @@ define("facetLabelPlacer", ["require", "exports", "common", "lib/polylabel", "st
             if (fallsInside) {
                 // do a more fine grained but more expensive check to see if each of the points fall within the polygon
                 for (let i = 0; i < neighbourPath.length && fallsInside; i++) {
-                    const distance = polylabel_1.pointToPolygonDist(neighbourPath[i].x, neighbourPath[i].y, onlyOuterRing);
+                    const distance = (0, polylabel_1.pointToPolygonDist)(neighbourPath[i].x, neighbourPath[i].y, onlyOuterRing);
                     if (distance < 0) {
                         // falls outside
                         fallsInside = false;
@@ -2635,9 +3350,10 @@ define("facetLabelPlacer", ["require", "exports", "common", "lib/polylabel", "st
 /**
  * Module that manages the GUI when processing
  */
-define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "common", "facetBorderSegmenter", "facetBorderTracer", "facetCreator", "facetLabelPlacer", "facetmanagement", "facetReducer", "gui", "structs/point"], function (require, exports, colorreductionmanagement_2, common_7, facetBorderSegmenter_1, facetBorderTracer_1, facetCreator_3, facetLabelPlacer_1, facetmanagement_4, facetReducer_1, gui_1, point_5) {
+define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "common", "facetBorderSegmenter", "facetBorderTracer", "facetCreator", "facetLabelPlacer", "facetmanagement", "facetReducer", "gui", "structs/point", "lib/constants"], function (require, exports, colorreductionmanagement_2, common_7, facetBorderSegmenter_1, facetBorderTracer_1, facetCreator_3, facetLabelPlacer_1, facetmanagement_5, facetReducer_1, gui_1, point_6, constants_5) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.GUIProcessManager = exports.ProcessResult = void 0;
     class ProcessResult {
     }
     exports.ProcessResult = ProcessResult;
@@ -2680,7 +3396,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 const tabsOutput = M.Tabs.getInstance(document.getElementById("tabsOutput"));
                 // k-means clustering
                 const kmeansImgData = yield GUIProcessManager.processKmeansClustering(imgData, tabsOutput, ctx, settings, cancellationToken);
-                let facetResult = new facetmanagement_4.FacetResult();
+                let facetResult = new facetmanagement_5.FacetResult();
                 let colormapResult = new colorreductionmanagement_2.ColorMapResult();
                 // build color map
                 colormapResult = colorreductionmanagement_2.ColorReducer.createColorMap(kmeansImgData);
@@ -2716,7 +3432,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
         }
         static processKmeansClustering(imgData, tabsOutput, ctx, settings, cancellationToken) {
             return __awaiter(this, void 0, void 0, function* () {
-                gui_1.time("K-means clustering");
+                (0, gui_1.time)("K-means clustering");
                 const cKmeans = document.getElementById("cKMeans");
                 cKmeans.width = imgData.width;
                 cKmeans.height = imgData.height;
@@ -2727,7 +3443,8 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 tabsOutput.select("kmeans-pane");
                 $(".status.kMeans").addClass("active");
                 yield colorreductionmanagement_2.ColorReducer.applyKMeansClustering(imgData, kmeansImgData, ctx, settings, (kmeans) => {
-                    const progress = (100 - (kmeans.currentDeltaDistanceDifference > 100 ? 100 : kmeans.currentDeltaDistanceDifference)) / 100;
+                    const maxDelta = constants_5.CLUSTERING_DEFAULTS.MAX_DELTA_DISTANCE_FOR_PROGRESS;
+                    const progress = (maxDelta - (kmeans.currentDeltaDistanceDifference > maxDelta ? maxDelta : kmeans.currentDeltaDistanceDifference)) / maxDelta;
                     $("#statusKMeans").css("width", Math.round(progress * 100) + "%");
                     ctxKmeans.putImageData(kmeansImgData, 0, 0);
                     console.log(kmeans.currentDeltaDistanceDifference);
@@ -2737,13 +3454,13 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 });
                 $(".status").removeClass("active");
                 $(".status.kMeans").addClass("complete");
-                gui_1.timeEnd("K-means clustering");
+                (0, gui_1.timeEnd)("K-means clustering");
                 return kmeansImgData;
             });
         }
         static processFacetBuilding(colormapResult, cancellationToken) {
             return __awaiter(this, void 0, void 0, function* () {
-                gui_1.time("Facet building");
+                (0, gui_1.time)("Facet building");
                 $(".status.facetBuilding").addClass("active");
                 const facetResult = yield facetCreator_3.FacetCreator.getFacets(colormapResult.width, colormapResult.height, colormapResult.imgColorIndices, (progress) => {
                     if (cancellationToken.isCancelled) {
@@ -2753,13 +3470,13 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 });
                 $(".status").removeClass("active");
                 $(".status.facetBuilding").addClass("complete");
-                gui_1.timeEnd("Facet building");
+                (0, gui_1.timeEnd)("Facet building");
                 return facetResult;
             });
         }
         static processFacetReduction(facetResult, tabsOutput, settings, colormapResult, cancellationToken) {
             return __awaiter(this, void 0, void 0, function* () {
-                gui_1.time("Facet reduction");
+                (0, gui_1.time)("Facet reduction");
                 const cReduction = document.getElementById("cReduction");
                 cReduction.width = facetResult.width;
                 cReduction.height = facetResult.height;
@@ -2790,12 +3507,12 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 });
                 $(".status").removeClass("active");
                 $(".status.facetReduction").addClass("complete");
-                gui_1.timeEnd("Facet reduction");
+                (0, gui_1.timeEnd)("Facet reduction");
             });
         }
         static processFacetBorderTracing(tabsOutput, facetResult, cancellationToken) {
             return __awaiter(this, void 0, void 0, function* () {
-                gui_1.time("Facet border tracing");
+                (0, gui_1.time)("Facet border tracing");
                 tabsOutput.select("borderpath-pane");
                 const cBorderPath = document.getElementById("cBorderPath");
                 cBorderPath.width = facetResult.width;
@@ -2823,12 +3540,12 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 });
                 $(".status").removeClass("active");
                 $(".status.facetBorderPath").addClass("complete");
-                gui_1.timeEnd("Facet border tracing");
+                (0, gui_1.timeEnd)("Facet border tracing");
             });
         }
         static processFacetBorderSegmentation(facetResult, tabsOutput, settings, cancellationToken) {
             return __awaiter(this, void 0, void 0, function* () {
-                gui_1.time("Facet border segmentation");
+                (0, gui_1.time)("Facet border segmentation");
                 const cBorderSegment = document.getElementById("cBorderSegmentation");
                 cBorderSegment.width = facetResult.width;
                 cBorderSegment.height = facetResult.height;
@@ -2857,13 +3574,13 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 });
                 $(".status").removeClass("active");
                 $(".status.facetBorderSegmentation").addClass("complete");
-                gui_1.timeEnd("Facet border segmentation");
+                (0, gui_1.timeEnd)("Facet border segmentation");
                 return cBorderSegment;
             });
         }
         static processFacetLabelPlacement(facetResult, cBorderSegment, tabsOutput, cancellationToken) {
             return __awaiter(this, void 0, void 0, function* () {
-                gui_1.time("Facet label placement");
+                (0, gui_1.time)("Facet label placement");
                 const cLabelPlacement = document.getElementById("cLabelPlacement");
                 cLabelPlacement.width = facetResult.width;
                 cLabelPlacement.height = facetResult.height;
@@ -2888,14 +3605,14 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                 });
                 $(".status").removeClass("active");
                 $(".status.facetLabelPlacement").addClass("complete");
-                gui_1.timeEnd("Facet label placement");
+                (0, gui_1.timeEnd)("Facet label placement");
             });
         }
         /**
          *  Creates a vector based SVG image of the facets with the given configuration
          */
-        static createSVG(facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = 50, fontColor = "black", onUpdate = null) {
-            return __awaiter(this, void 0, void 0, function* () {
+        static createSVG(facetResult_1, colorsByIndex_1, sizeMultiplier_1, fill_2, stroke_1, addColorLabels_1) {
+            return __awaiter(this, arguments, void 0, function* (facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = constants_5.SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor = constants_5.SVG_CONSTANTS.DEFAULT_FONT_COLOR, onUpdate = null) {
                 const xmlns = "http://www.w3.org/2000/svg";
                 const svg = document.createElementNS(xmlns, "svg");
                 svg.setAttribute("width", sizeMultiplier * facetResult.width + "");
@@ -2915,7 +3632,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                         }
                         else {
                             for (let i = 0; i < f.borderPath.length; i++) {
-                                newpath.push(new point_5.Point(f.borderPath[i].getWallX() + 0.5, f.borderPath[i].getWallY() + 0.5));
+                                newpath.push(new point_6.Point(f.borderPath[i].getWallX() + 0.5, f.borderPath[i].getWallY() + 0.5));
                             }
                         }
                         if (newpath[0].x !== newpath[newpath.length - 1].x || newpath[0].y !== newpath[newpath.length - 1].y) {
@@ -3000,8 +3717,8 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                             g.appendChild(subsvg);
                             svg.appendChild(g);
                         }
-                        if (count % 100 === 0) {
-                            yield common_7.delay(0);
+                        if (count % constants_5.UPDATE_INTERVALS.BATCH_UPDATE_FREQUENCY === 0) {
+                            yield (0, common_7.delay)(0);
                             if (onUpdate != null) {
                                 onUpdate(f.id / facetResult.facets.length);
                             }
@@ -3021,9 +3738,19 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
 /**
  * Module that provides function the GUI uses and updates the DOM accordingly
  */
-define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"], function (require, exports, common_8, guiprocessmanager_1, settings_2) {
+define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"], function (require, exports, common_8, guiprocessmanager_1, settings_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.time = time;
+    exports.timeEnd = timeEnd;
+    exports.log = log;
+    exports.parseSettings = parseSettings;
+    exports.process = process;
+    exports.updateOutput = updateOutput;
+    exports.downloadPalettePng = downloadPalettePng;
+    exports.downloadPNG = downloadPNG;
+    exports.downloadSVG = downloadSVG;
+    exports.loadExample = loadExample;
     let processResult = null;
     let cancellationToken = new common_8.CancellationToken();
     const timers = {};
@@ -3031,28 +3758,25 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
         console.time(name);
         timers[name] = new Date();
     }
-    exports.time = time;
     function timeEnd(name) {
         console.timeEnd(name);
         const ms = new Date().getTime() - timers[name].getTime();
         log(name + ": " + ms + "ms");
         delete timers[name];
     }
-    exports.timeEnd = timeEnd;
     function log(str) {
         $("#log").append("<br/><span>" + str + "</span>");
     }
-    exports.log = log;
     function parseSettings() {
-        const settings = new settings_2.Settings();
+        const settings = new settings_3.Settings();
         if ($("#optColorSpaceRGB").prop("checked")) {
-            settings.kMeansClusteringColorSpace = settings_2.ClusteringColorSpace.RGB;
+            settings.kMeansClusteringColorSpace = settings_3.ClusteringColorSpace.RGB;
         }
         else if ($("#optColorSpaceHSL").prop("checked")) {
-            settings.kMeansClusteringColorSpace = settings_2.ClusteringColorSpace.HSL;
+            settings.kMeansClusteringColorSpace = settings_3.ClusteringColorSpace.HSL;
         }
         else if ($("#optColorSpaceRGB").prop("checked")) {
-            settings.kMeansClusteringColorSpace = settings_2.ClusteringColorSpace.LAB;
+            settings.kMeansClusteringColorSpace = settings_3.ClusteringColorSpace.LAB;
         }
         if ($("#optFacetRemovalLargestToSmallest").prop("checked")) {
             settings.removeFacetsFromLargeToSmall = true;
@@ -3102,7 +3826,6 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
         }
         return settings;
     }
-    exports.parseSettings = parseSettings;
     function process() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -3120,7 +3843,6 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
             }
         });
     }
-    exports.process = process;
     function updateOutput() {
         return __awaiter(this, void 0, void 0, function* () {
             if (processResult != null) {
@@ -3147,7 +3869,6 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
             }
         });
     }
-    exports.updateOutput = updateOutput;
     function createPaletteHtml(colorsByIndex) {
         let html = "";
         for (let c = 0; c < colorsByIndex.length; c++) {
@@ -3203,13 +3924,11 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
         dl.setAttribute("download", "palette.png");
         dl.click();
     }
-    exports.downloadPalettePng = downloadPalettePng;
     function downloadPNG() {
         if ($("#svgContainer svg").length > 0) {
             saveSvgAsPng($("#svgContainer svg").get(0), "paintbynumbers.png");
         }
     }
-    exports.downloadPNG = downloadPNG;
     function downloadSVG() {
         if ($("#svgContainer svg").length > 0) {
             const svgEl = $("#svgContainer svg").get(0);
@@ -3235,7 +3954,6 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
             */
         }
     }
-    exports.downloadSVG = downloadSVG;
     function loadExample(imgId) {
         // load image
         const img = document.getElementById(imgId);
@@ -3245,11 +3963,11 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
         c.height = img.naturalHeight;
         ctx.drawImage(img, 0, 0);
     }
-    exports.loadExample = loadExample;
 });
 define("lib/clipboard", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Clipboard = void 0;
     // From https://stackoverflow.com/a/35576409/694640
     /**
      * image pasting into canvas
@@ -3422,11 +4140,11 @@ define("main", ["require", "exports", "gui", "lib/clipboard"], function (require
                 reader.readAsDataURL(files[0]);
             }
         });
-        gui_2.loadExample("imgSmall");
+        (0, gui_2.loadExample)("imgSmall");
         $("#btnProcess").click(function () {
             return __awaiter(this, void 0, void 0, function* () {
                 try {
-                    yield gui_2.process();
+                    yield (0, gui_2.process)();
                 }
                 catch (err) {
                     alert("Error: " + err);
@@ -3434,19 +4152,561 @@ define("main", ["require", "exports", "gui", "lib/clipboard"], function (require
             });
         });
         $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize, #txtLabelFontColor").change(() => __awaiter(this, void 0, void 0, function* () {
-            yield gui_2.updateOutput();
+            yield (0, gui_2.updateOutput)();
         }));
         $("#btnDownloadSVG").click(function () {
-            gui_2.downloadSVG();
+            (0, gui_2.downloadSVG)();
         });
         $("#btnDownloadPNG").click(function () {
-            gui_2.downloadPNG();
+            (0, gui_2.downloadPNG)();
         });
         $("#btnDownloadPalettePNG").click(function () {
-            gui_2.downloadPalettePng();
+            (0, gui_2.downloadPalettePng)();
         });
-        $("#lnkTrivial").click(() => { gui_2.loadExample("imgTrivial"); return false; });
-        $("#lnkSmall").click(() => { gui_2.loadExample("imgSmall"); return false; });
-        $("#lnkMedium").click(() => { gui_2.loadExample("imgMedium"); return false; });
+        $("#lnkTrivial").click(() => { (0, gui_2.loadExample)("imgTrivial"); return false; });
+        $("#lnkSmall").click(() => { (0, gui_2.loadExample)("imgSmall"); return false; });
+        $("#lnkMedium").click(() => { (0, gui_2.loadExample)("imgMedium"); return false; });
     });
+});
+/**
+ * Color class for type-safe color operations and conversions
+ *
+ * Provides a unified interface for working with colors in different color spaces
+ * (RGB, HSL, LAB). Internally stores colors as RGB and converts on demand.
+ *
+ * @module Color
+ */
+define("lib/Color", ["require", "exports", "lib/colorconversion", "lib/constants"], function (require, exports, colorconversion_2, constants_6) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Color = void 0;
+    /**
+     * Immutable Color class with conversions between RGB, HSL, and LAB color spaces
+     *
+     * @example
+     * ```typescript
+     * // Create colors
+     * const red = Color.fromRGB(255, 0, 0);
+     * const blue = Color.fromHSL(240, 100, 50);
+     *
+     * // Convert between spaces
+     * const hsl = red.toHSL();
+     * const lab = red.toLAB();
+     *
+     * // Calculate distances
+     * const distance = red.distanceRGB(blue);
+     * const perceptual = red.distanceLAB(blue);
+     *
+     * // Utilities
+     * const hex = red.toHex(); // "#ff0000"
+     * const equal = red.equals(Color.fromRGB(255, 0, 0)); // true
+     * ```
+     */
+    class Color {
+        /**
+         * Private constructor - use factory methods instead
+         * @private
+         */
+        constructor(rgb) {
+            this.rgb = {
+                r: Math.round(Math.max(0, Math.min(255, rgb.r))),
+                g: Math.round(Math.max(0, Math.min(255, rgb.g))),
+                b: Math.round(Math.max(0, Math.min(255, rgb.b))),
+            };
+        }
+        /**
+         * Create color from RGB values
+         *
+         * @param r - Red (0-255)
+         * @param g - Green (0-255)
+         * @param b - Blue (0-255)
+         * @returns New Color instance
+         *
+         * @example
+         * ```typescript
+         * const red = Color.fromRGB(255, 0, 0);
+         * const white = Color.fromRGB(255, 255, 255);
+         * ```
+         */
+        static fromRGB(r, g, b) {
+            return new Color({ r, g, b });
+        }
+        /**
+         * Create color from HSL values
+         *
+         * @param h - Hue (0-1, represents 0-360°)
+         * @param s - Saturation (0-1, represents 0-100%)
+         * @param l - Lightness (0-1, represents 0-100%)
+         * @returns New Color instance
+         *
+         * @example
+         * ```typescript
+         * const red = Color.fromHSL(0, 1, 0.5);
+         * const cyan = Color.fromHSL(0.5, 1, 0.5);
+         * ```
+         */
+        static fromHSL(h, s, l) {
+            const rgb = (0, colorconversion_2.hslToRgb)(h, s, l);
+            return new Color({ r: rgb[0], g: rgb[1], b: rgb[2] });
+        }
+        /**
+         * Create color from LAB values
+         *
+         * @param l - Lightness (0-100)
+         * @param a - Green-red axis (-128 to 127)
+         * @param b - Blue-yellow axis (-128 to 127)
+         * @returns New Color instance
+         *
+         * @example
+         * ```typescript
+         * const color = Color.fromLAB(50, 25, -50);
+         * ```
+         */
+        static fromLAB(l, a, b) {
+            const rgb = (0, colorconversion_2.lab2rgb)([l, a, b]);
+            return new Color({ r: rgb[0], g: rgb[1], b: rgb[2] });
+        }
+        /**
+         * Create color from hex string
+         *
+         * @param hex - Hex color string (e.g., "#ff0000" or "ff0000")
+         * @returns New Color instance
+         *
+         * @example
+         * ```typescript
+         * const red = Color.fromHex("#ff0000");
+         * const blue = Color.fromHex("0000ff");
+         * ```
+         */
+        static fromHex(hex) {
+            // Remove # if present
+            hex = hex.replace(/^#/, '');
+            // Parse hex values
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            return new Color({ r, g, b });
+        }
+        /**
+         * Get RGB representation
+         *
+         * @returns RGB object with r, g, b values (0-255)
+         */
+        toRGB() {
+            return Object.assign({}, this.rgb);
+        }
+        /**
+         * Get HSL representation
+         *
+         * @returns HSL object with h (0-1), s (0-1), l (0-1)
+         */
+        toHSL() {
+            const hsl = (0, colorconversion_2.rgbToHsl)(this.rgb.r, this.rgb.g, this.rgb.b);
+            return { h: hsl[0], s: hsl[1], l: hsl[2] };
+        }
+        /**
+         * Get LAB representation
+         *
+         * @returns LAB object with l, a, b values
+         */
+        toLAB() {
+            const lab = (0, colorconversion_2.rgb2lab)([this.rgb.r, this.rgb.g, this.rgb.b]);
+            return { l: lab[0], a: lab[1], b: lab[2] };
+        }
+        /**
+         * Calculate distance to another color in specified color space
+         *
+         * @param other - Color to compare to
+         * @param space - Color space to use for distance calculation
+         * @returns Euclidean distance in specified space
+         *
+         * @example
+         * ```typescript
+         * const red = Color.fromRGB(255, 0, 0);
+         * const blue = Color.fromRGB(0, 0, 255);
+         *
+         * const rgbDist = red.distanceTo(blue, ColorSpace.RGB);
+         * const labDist = red.distanceTo(blue, ColorSpace.LAB);
+         * ```
+         */
+        distanceTo(other, space) {
+            if (space === constants_6.ColorSpace.RGB) {
+                return this.distanceRGB(other);
+            }
+            else if (space === constants_6.ColorSpace.HSL) {
+                return this.distanceHSL(other);
+            }
+            else if (space === constants_6.ColorSpace.LAB) {
+                return this.distanceLAB(other);
+            }
+            return this.distanceRGB(other);
+        }
+        /**
+         * Calculate Euclidean distance in RGB space
+         *
+         * @param other - Color to compare to
+         * @returns Distance in RGB space
+         */
+        distanceRGB(other) {
+            const dr = this.rgb.r - other.rgb.r;
+            const dg = this.rgb.g - other.rgb.g;
+            const db = this.rgb.b - other.rgb.b;
+            return Math.sqrt(dr * dr + dg * dg + db * db);
+        }
+        /**
+         * Calculate distance in HSL space
+         *
+         * Uses weighted distance accounting for hue circularity
+         *
+         * @param other - Color to compare to
+         * @returns Distance in HSL space
+         */
+        distanceHSL(other) {
+            const hsl1 = this.toHSL();
+            const hsl2 = other.toHSL();
+            // Handle hue circularity (0 and 1 are adjacent)
+            let dh = Math.abs(hsl1.h - hsl2.h);
+            if (dh > 0.5)
+                dh = 1 - dh;
+            const ds = hsl1.s - hsl2.s;
+            const dl = hsl1.l - hsl2.l;
+            // Weighted distance (hue more important than saturation/lightness)
+            return Math.sqrt(dh * dh * 360 * 360 + ds * ds * 100 * 100 + dl * dl * 100 * 100);
+        }
+        /**
+         * Calculate Delta E distance in LAB space (perceptually uniform)
+         *
+         * LAB is designed to be perceptually uniform, so Euclidean distance
+         * in LAB space approximates perceived color difference
+         *
+         * @param other - Color to compare to
+         * @returns Delta E distance (perceptual color difference)
+         */
+        distanceLAB(other) {
+            const lab1 = this.toLAB();
+            const lab2 = other.toLAB();
+            const dl = lab1.l - lab2.l;
+            const da = lab1.a - lab2.a;
+            const db = lab1.b - lab2.b;
+            return Math.sqrt(dl * dl + da * da + db * db);
+        }
+        /**
+         * Create a deep copy of this color
+         *
+         * @returns New Color instance with same values
+         */
+        clone() {
+            return new Color(Object.assign({}, this.rgb));
+        }
+        /**
+         * Check if two colors are equal (in RGB space)
+         *
+         * @param other - Color to compare to
+         * @param tolerance - Maximum difference per channel (default: 0)
+         * @returns true if colors are equal within tolerance
+         *
+         * @example
+         * ```typescript
+         * const c1 = Color.fromRGB(255, 0, 0);
+         * const c2 = Color.fromRGB(255, 0, 0);
+         * const c3 = Color.fromRGB(254, 0, 0);
+         *
+         * c1.equals(c2); // true
+         * c1.equals(c3); // false
+         * c1.equals(c3, 1); // true (within tolerance of 1)
+         * ```
+         */
+        equals(other, tolerance = 0) {
+            return (Math.abs(this.rgb.r - other.rgb.r) <= tolerance &&
+                Math.abs(this.rgb.g - other.rgb.g) <= tolerance &&
+                Math.abs(this.rgb.b - other.rgb.b) <= tolerance);
+        }
+        /**
+         * Convert color to hex string
+         *
+         * @returns Hex string (e.g., "#ff0000")
+         *
+         * @example
+         * ```typescript
+         * const red = Color.fromRGB(255, 0, 0);
+         * red.toHex(); // "#ff0000"
+         * ```
+         */
+        toHex() {
+            const toHex = (n) => {
+                const hex = Math.round(n).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            };
+            return '#' + toHex(this.rgb.r) + toHex(this.rgb.g) + toHex(this.rgb.b);
+        }
+        /**
+         * Get CSS rgb() string
+         *
+         * @returns CSS rgb string (e.g., "rgb(255, 0, 0)")
+         */
+        toCSSRGB() {
+            return `rgb(${Math.round(this.rgb.r)}, ${Math.round(this.rgb.g)}, ${Math.round(this.rgb.b)})`;
+        }
+        /**
+         * Get string representation of color
+         *
+         * @returns Hex string representation
+         */
+        toString() {
+            return this.toHex();
+        }
+    }
+    exports.Color = Color;
+});
+/**
+ * Flood fill algorithm for finding connected regions
+ *
+ * Provides a class-based interface for flood-fill operations, making it
+ * easier to test and reuse across different parts of the application.
+ *
+ * @module FloodFillAlgorithm
+ */
+define("lib/FloodFillAlgorithm", ["require", "exports", "structs/point", "lib/boundaryUtils"], function (require, exports, point_7, boundaryUtils_3) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.FloodFillAlgorithm = void 0;
+    /**
+     * Flood fill algorithm implementation
+     *
+     * Uses a stack-based approach to find all connected pixels matching a predicate.
+     * The algorithm starts from a seed point and expands to all reachable neighbors
+     * that satisfy the given condition.
+     *
+     * @example
+     * ```typescript
+     * const floodFill = new FloodFillAlgorithm();
+     * const start = new Point(10, 10);
+     * const region = floodFill.fill(
+     *   start,
+     *   width,
+     *   height,
+     *   (x, y) => colorMap[y * width + x] === targetColor
+     * );
+     * console.log(`Found region with ${region.length} pixels`);
+     * ```
+     */
+    class FloodFillAlgorithm {
+        /**
+         * Perform flood fill from a starting point
+         *
+         * Finds all connected pixels that satisfy the shouldInclude predicate
+         * using 4-connectivity (up, down, left, right neighbors).
+         *
+         * @param start - Starting point for the flood fill
+         * @param width - Width of the area to fill
+         * @param height - Height of the area to fill
+         * @param shouldInclude - Predicate function that returns true if a pixel should be included
+         * @returns Array of all points in the filled region
+         *
+         * @example
+         * ```typescript
+         * const floodFill = new FloodFillAlgorithm();
+         * const filled = floodFill.fill(
+         *   new Point(5, 5),
+         *   100,
+         *   100,
+         *   (x, y) => !visited[y * 100 + x] && colorMap[y * 100 + x] === targetColor
+         * );
+         * ```
+         */
+        fill(start, width, height, shouldInclude) {
+            const filled = [];
+            const visited = new Set();
+            const stack = [start];
+            while (stack.length > 0) {
+                const point = stack.pop();
+                const key = point.y * width + point.x;
+                // Skip if already visited
+                if (visited.has(key)) {
+                    continue;
+                }
+                // Skip if out of bounds
+                if (!(0, boundaryUtils_3.isInBounds)(point.x, point.y, width, height)) {
+                    continue;
+                }
+                // Skip if doesn't match predicate
+                if (!shouldInclude(point.x, point.y)) {
+                    continue;
+                }
+                // Mark as visited and add to result
+                visited.add(key);
+                filled.push(point);
+                // Add 4-connected neighbors to stack
+                // Note: We don't use getNeighbors4 here to avoid extra allocations
+                // Instead, we push points directly and rely on bounds checking above
+                if (point.y > 0) {
+                    stack.push(new point_7.Point(point.x, point.y - 1)); // Up
+                }
+                if (point.y < height - 1) {
+                    stack.push(new point_7.Point(point.x, point.y + 1)); // Down
+                }
+                if (point.x > 0) {
+                    stack.push(new point_7.Point(point.x - 1, point.y)); // Left
+                }
+                if (point.x < width - 1) {
+                    stack.push(new point_7.Point(point.x + 1, point.y)); // Right
+                }
+            }
+            return filled;
+        }
+        /**
+         * Perform flood fill with a custom callback for each filled pixel
+         *
+         * Similar to fill() but executes a callback for each pixel instead of
+         * collecting them in an array. This is more memory-efficient for large regions.
+         *
+         * @param start - Starting point for the flood fill
+         * @param width - Width of the area to fill
+         * @param height - Height of the area to fill
+         * @param shouldInclude - Predicate function that returns true if a pixel should be included
+         * @param onFill - Callback function executed for each filled pixel
+         * @returns Number of pixels filled
+         *
+         * @example
+         * ```typescript
+         * const floodFill = new FloodFillAlgorithm();
+         * const count = floodFill.fillWithCallback(
+         *   new Point(5, 5),
+         *   100,
+         *   100,
+         *   (x, y) => !visited[y * 100 + x],
+         *   (x, y) => {
+         *     visited[y * 100 + x] = true;
+         *     colorMap[y * 100 + x] = newColor;
+         *   }
+         * );
+         * ```
+         */
+        fillWithCallback(start, width, height, shouldInclude, onFill) {
+            const visited = new Set();
+            const stack = [start];
+            let count = 0;
+            while (stack.length > 0) {
+                const point = stack.pop();
+                const key = point.y * width + point.x;
+                if (visited.has(key)) {
+                    continue;
+                }
+                if (!(0, boundaryUtils_3.isInBounds)(point.x, point.y, width, height)) {
+                    continue;
+                }
+                if (!shouldInclude(point.x, point.y)) {
+                    continue;
+                }
+                visited.add(key);
+                onFill(point.x, point.y);
+                count++;
+                // Add 4-connected neighbors
+                if (point.y > 0) {
+                    stack.push(new point_7.Point(point.x, point.y - 1));
+                }
+                if (point.y < height - 1) {
+                    stack.push(new point_7.Point(point.x, point.y + 1));
+                }
+                if (point.x > 0) {
+                    stack.push(new point_7.Point(point.x - 1, point.y));
+                }
+                if (point.x < width - 1) {
+                    stack.push(new point_7.Point(point.x + 1, point.y));
+                }
+            }
+            return count;
+        }
+    }
+    exports.FloodFillAlgorithm = FloodFillAlgorithm;
+});
+define("lib/config", ["require", "exports", "lib/constants"], function (require, exports, constants_7) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.DEFAULT_CONFIG = void 0;
+    exports.mergeConfig = mergeConfig;
+    exports.validateConfig = validateConfig;
+    exports.assertValidConfig = assertValidConfig;
+    /**
+     * Default configuration using constants
+     */
+    exports.DEFAULT_CONFIG = {
+        colorCount: constants_7.CLUSTERING_DEFAULTS.DEFAULT_COLOR_COUNT,
+        colorSpace: constants_7.ColorSpace.RGB,
+        clusteringIterations: constants_7.CLUSTERING_DEFAULTS.MAX_ITERATIONS,
+        clusteringMinDeltaDifference: constants_7.CLUSTERING_DEFAULTS.CONVERGENCE_THRESHOLD,
+        minFacetSize: constants_7.FACET_THRESHOLDS.MIN_FACET_SIZE,
+        maxFacetCount: constants_7.FACET_THRESHOLDS.MAX_FACET_COUNT,
+        narrowPixelStripCleanupRuns: constants_7.SEGMENTATION_CONSTANTS.DEFAULT_NARROW_STRIP_CLEANUP_RUNS,
+        removeFacetsFromLargeToSmall: true,
+        nrOfTimesToHalveBorderSegments: constants_7.SEGMENTATION_CONSTANTS.DEFAULT_HALVE_ITERATIONS,
+        resizeImageIfTooLarge: true,
+        resizeImageWidth: constants_7.IMAGE_CONSTANTS.DEFAULT_RESIZE_WIDTH,
+        resizeImageHeight: constants_7.IMAGE_CONSTANTS.DEFAULT_RESIZE_HEIGHT,
+        randomSeed: 0, // 0 = use current time
+    };
+    /**
+     * Merge user configuration with defaults
+     *
+     * @param userConfig - Partial configuration provided by user
+     * @returns Complete configuration with defaults filled in
+     */
+    function mergeConfig(userConfig) {
+        return Object.assign(Object.assign({}, exports.DEFAULT_CONFIG), userConfig);
+    }
+    /**
+     * Validate configuration values
+     *
+     * @param config - Configuration to validate
+     * @returns Array of error messages (empty if valid)
+     */
+    function validateConfig(config) {
+        const errors = [];
+        if (config.colorCount < constants_7.CLUSTERING_DEFAULTS.MIN_COLOR_COUNT ||
+            config.colorCount > constants_7.CLUSTERING_DEFAULTS.MAX_COLOR_COUNT) {
+            errors.push(`colorCount must be between ${constants_7.CLUSTERING_DEFAULTS.MIN_COLOR_COUNT} ` +
+                `and ${constants_7.CLUSTERING_DEFAULTS.MAX_COLOR_COUNT}`);
+        }
+        if (config.clusteringIterations < 1) {
+            errors.push('clusteringIterations must be at least 1');
+        }
+        if (config.clusteringMinDeltaDifference < 0) {
+            errors.push('clusteringMinDeltaDifference must be non-negative');
+        }
+        if (config.minFacetSize < 1) {
+            errors.push('minFacetSize must be at least 1');
+        }
+        if (config.maxFacetCount < 1) {
+            errors.push('maxFacetCount must be at least 1');
+        }
+        if (config.narrowPixelStripCleanupRuns < 0) {
+            errors.push('narrowPixelStripCleanupRuns must be non-negative');
+        }
+        if (config.nrOfTimesToHalveBorderSegments < 0) {
+            errors.push('nrOfTimesToHalveBorderSegments must be non-negative');
+        }
+        if (config.resizeImageWidth < 1) {
+            errors.push('resizeImageWidth must be at least 1');
+        }
+        if (config.resizeImageHeight < 1) {
+            errors.push('resizeImageHeight must be at least 1');
+        }
+        const validColorSpaces = [constants_7.ColorSpace.RGB, constants_7.ColorSpace.HSL, constants_7.ColorSpace.LAB];
+        if (validColorSpaces.indexOf(config.colorSpace) === -1) {
+            errors.push('colorSpace must be RGB, HSL, or LAB');
+        }
+        return errors;
+    }
+    /**
+     * Assert configuration is valid (throws on error)
+     *
+     * @param config - Configuration to validate
+     * @throws Error if configuration is invalid
+     */
+    function assertValidConfig(config) {
+        const errors = validateConfig(config);
+        if (errors.length > 0) {
+            throw new Error(`Invalid configuration:\n${errors.join('\n')}`);
+        }
+    }
 });
