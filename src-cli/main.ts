@@ -98,12 +98,12 @@ async function main() {
     ctxKmeans.fillRect(0, 0, cKmeans.width, cKmeans.height);
 
     const kmeansImgData = ctxKmeans.getImageData(0, 0, cKmeans.width, cKmeans.height);
-    await ColorReducer.applyKMeansClustering(imgData, kmeansImgData, ctx, settings, (kmeans) => {
+    await ColorReducer.applyKMeansClustering(imgData as any, kmeansImgData as any, ctx as any, settings, (kmeans) => {
         const progress = (100 - (kmeans.currentDeltaDistanceDifference > 100 ? 100 : kmeans.currentDeltaDistanceDifference)) / 100;
         ctxKmeans.putImageData(kmeansImgData, 0, 0);
     });
 
-    const colormapResult = ColorReducer.createColorMap(kmeansImgData);
+    const colormapResult = ColorReducer.createColorMap(kmeansImgData as any);
 
     let facetResult = new FacetResult();
     if (typeof settings.narrowPixelStripCleanupRuns === "undefined" || settings.narrowPixelStripCleanupRuns === 0) {
