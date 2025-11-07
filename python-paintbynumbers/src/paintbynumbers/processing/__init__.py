@@ -11,6 +11,7 @@ from paintbynumbers.processing.colorreduction import ColorReducer, ColorMapResul
 from paintbynumbers.processing.facetreduction import FacetReducer
 from paintbynumbers.processing.facetbordertracer import FacetBorderTracer
 from paintbynumbers.processing.facetbordersegmenter import FacetBorderSegmenter
+from paintbynumbers.processing.facetlabelplacer import FacetLabelPlacer
 
 __all__ = [
     'Facet',
@@ -23,4 +24,5 @@ __all__ = [
     'FacetReducer',
     'FacetBorderTracer',
     'FacetBorderSegmenter',
+    'FacetLabelPlacer',
 ]

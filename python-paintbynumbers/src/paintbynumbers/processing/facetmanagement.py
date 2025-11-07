@@ -25,6 +25,7 @@ class Facet:
         bbox: Bounding box containing all facet points
         borderPath: Ordered list of PathPoints tracing the facet border
         borderSegments: List of FacetBoundarySegments for border
+        labelBounds: Bounding box for label placement
 
     Example:
         >>> facet = Facet()
@@ -45,6 +46,58 @@ class Facet:
         self.bbox: BoundingBox = BoundingBox()
         self.borderPath: List[PathPoint] = []
         self.borderSegments: List['FacetBoundarySegment'] = []
+        self.labelBounds: BoundingBox = BoundingBox()
+
+    def get_full_path_from_border_segments(self, use_walls: bool = False) -> List[Point]:
+        """Get the full path from border segments.
+
+        Reconstructs the complete border path by concatenating all border segments
+        in order. Handles segments that need to be traversed in reverse order and
+        adds transition points between segments for continuity.
+
+        Args:
+            use_walls: If True, use wall coordinates (±0.5). If False, use pixel centers.
+
+        Returns:
+            List of Points forming the complete border path
+
+        Example:
+            >>> facet = Facet()
+            >>> # ... setup facet with border segments ...
+            >>> path = facet.get_full_path_from_border_segments(use_walls=True)
+            >>> print(len(path))
+            100
+        """
+        newpath: List[Point] = []
+
+        def add_point(pt: PathPoint) -> None:
+            if use_walls:
+                newpath.append(Point(pt.get_wall_x(), pt.get_wall_y()))
+            else:
+                newpath.append(Point(pt.x, pt.y))
+
+        last_segment: Optional[FacetBoundarySegment] = None
+
+        for seg in self.borderSegments:
+            # Fix for continuity: repeat transition points between segments
+            # to prevent holes when rendered
+            if last_segment is not None:
+                if last_segment.reverseOrder:
+                    add_point(last_segment.originalSegment.points[0])
+                else:
+                    add_point(last_segment.originalSegment.points[-1])
+
+            # Add all points from this segment (in correct order)
+            for i in range(len(seg.originalSegment.points)):
+                if seg.reverseOrder:
+                    idx = len(seg.originalSegment.points) - 1 - i
+                else:
+                    idx = i
+                add_point(seg.originalSegment.points[idx])
+
+            last_segment = seg
+
+        return newpath
 
     def __repr__(self) -> str:
         """Return string representation of facet."""
