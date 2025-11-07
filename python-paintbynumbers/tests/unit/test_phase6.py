@@ -178,7 +178,7 @@ class TestSVGBuilder:
 
         facet0 = Facet()
         facet0.id = 0
-        facet0.color = 5
+        facet0.color = 0  # Fixed: color index must match colors array
         facet0.pointCount = 4
 
         points = [PathPoint(0, 0, OrientationEnum.Top)]
@@ -193,7 +193,7 @@ class TestSVGBuilder:
         svg = SVGBuilder.create_svg(facet_result, colors, add_color_labels=True)
 
         assert 'text' in svg
-        assert '>5<' in svg or '5' in svg
+        assert '>1<' in svg or '1' in svg  # Labels are 1-based (id + 1)
 
     def test_create_svg_scale(self):
         """Test SVG scaling."""
