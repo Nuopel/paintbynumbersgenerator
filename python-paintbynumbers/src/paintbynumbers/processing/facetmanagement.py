@@ -9,6 +9,7 @@ from typing import List, Optional
 from paintbynumbers.structs.point import Point
 from paintbynumbers.structs.boundingbox import BoundingBox
 from paintbynumbers.structs.typed_arrays import Uint32Array2D
+from paintbynumbers.core.types import PathPoint
 
 
 class Facet:
@@ -22,6 +23,8 @@ class Facet:
         neighbourFacets: List of neighboring facet IDs (None if dirty)
         neighbourFacetsIsDirty: Flag indicating neighbor list needs rebuilding
         bbox: Bounding box containing all facet points
+        borderPath: Ordered list of PathPoints tracing the facet border
+        borderSegments: List of FacetBoundarySegments for border
 
     Example:
         >>> facet = Facet()
@@ -40,6 +43,8 @@ class Facet:
         self.neighbourFacets: Optional[List[int]] = None
         self.neighbourFacetsIsDirty: bool = False
         self.bbox: BoundingBox = BoundingBox()
+        self.borderPath: List[PathPoint] = []
+        self.borderSegments: List['FacetBoundarySegment'] = []
 
     def __repr__(self) -> str:
         """Return string representation of facet."""
@@ -88,3 +93,80 @@ class FacetResult:
         """Return string representation of facet result."""
         return (f"FacetResult(width={self.width}, height={self.height}, "
                 f"facets={self.get_facet_count()}/{len(self.facets)})")
+
+
+class PathSegment:
+    """A segment of a border path that is adjacent to a specific neighbour facet.
+
+    Path segments are created by splitting a border path where the neighboring
+    facet changes. This allows matching segments between adjacent facets.
+
+    Attributes:
+        points: Ordered list of PathPoints forming the segment
+        neighbour: Facet ID of the neighbor this segment borders (-1 for image edge)
+
+    Example:
+        >>> from paintbynumbers.core.types import PathPoint, OrientationEnum
+        >>> points = [PathPoint(1, 1, OrientationEnum.Left), PathPoint(1, 2, OrientationEnum.Left)]
+        >>> segment = PathSegment(points, neighbour=5)
+        >>> print(len(segment.points))
+        2
+    """
+
+    def __init__(self, points: List[PathPoint], neighbour: int) -> None:
+        """Create a new path segment.
+
+        Args:
+            points: Ordered list of PathPoints
+            neighbour: Facet ID of neighboring facet
+        """
+        self.points: List[PathPoint] = points
+        self.neighbour: int = neighbour
+
+    def __repr__(self) -> str:
+        """Return string representation of path segment."""
+        return f"PathSegment(points={len(self.points)}, neighbour={self.neighbour})"
+
+
+class FacetBoundarySegment:
+    """Describes a matched segment shared between 2 facets.
+
+    When two segments are matched, one becomes the original segment and
+    the other references it. This ensures that adjacent facets share the
+    exact same segment, but sometimes in reverse order to maintain path continuity.
+
+    Attributes:
+        originalSegment: The canonical PathSegment instance
+        neighbour: Facet ID of the neighbor this segment borders
+        reverseOrder: If True, traverse segment points in reverse
+
+    Example:
+        >>> from paintbynumbers.core.types import PathPoint, OrientationEnum
+        >>> points = [PathPoint(1, 1, OrientationEnum.Left)]
+        >>> orig_segment = PathSegment(points, 5)
+        >>> boundary = FacetBoundarySegment(orig_segment, neighbour=3, reverseOrder=False)
+        >>> print(boundary.neighbour)
+        3
+    """
+
+    def __init__(
+        self,
+        originalSegment: PathSegment,
+        neighbour: int,
+        reverseOrder: bool
+    ) -> None:
+        """Create a new facet boundary segment.
+
+        Args:
+            originalSegment: The canonical PathSegment instance
+            neighbour: Facet ID of the neighbor
+            reverseOrder: Whether to traverse points in reverse
+        """
+        self.originalSegment: PathSegment = originalSegment
+        self.neighbour: int = neighbour
+        self.reverseOrder: bool = reverseOrder
+
+    def __repr__(self) -> str:
+        """Return string representation of facet boundary segment."""
+        return (f"FacetBoundarySegment(points={len(self.originalSegment.points)}, "
+                f"neighbour={self.neighbour}, reverse={self.reverseOrder})")
