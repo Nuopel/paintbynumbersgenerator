@@ -63,7 +63,7 @@ class SVGBuilder:
         svg.set('xmlns', 'http://www.w3.org/2000/svg')
         svg.set('width', str(int(size_multiplier * facet_result.width)))
         svg.set('height', str(int(size_multiplier * facet_result.height)))
-        svg.set('viewBox', f'0 0 {facet_result.width} {facet_result.height}')
+        svg.set('viewBox', f'0 0 {int(size_multiplier * facet_result.width)} {int(size_multiplier * facet_result.height)}')
 
         # Process each facet
         for f in facet_result.facets:
