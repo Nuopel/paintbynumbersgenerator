@@ -5,7 +5,8 @@ reduce the total number of facets and create cleaner paint-by-numbers output.
 """
 
 from __future__ import annotations
-from typing import List, Set, Dict, Optional
+from typing import List, Set, Dict, Optional, Callable
+import time
 from paintbynumbers.core.types import RGB
 from paintbynumbers.structs.point import Point
 from paintbynumbers.structs.typed_arrays import BooleanArray2D, Uint8Array2D
@@ -28,7 +29,8 @@ class FacetReducer:
         maximum_number_of_facets: Optional[int],
         colors_by_index: List[RGB],
         facet_result: FacetResult,
-        img_color_indices: Uint8Array2D
+        img_color_indices: Uint8Array2D,
+        on_update: Optional[Callable[[float], None]] = None
     ) -> None:
         """Remove all facets with pointCount smaller than the given threshold.
 
@@ -43,6 +45,7 @@ class FacetReducer:
             colors_by_index: Array of RGB colors
             facet_result: Facet result to modify
             img_color_indices: Color index map to update
+            on_update: Optional progress callback (0.0 to 1.0)
 
         Example:
             >>> FacetReducer.reduce_facets(
@@ -51,7 +54,8 @@ class FacetReducer:
             ...     maximum_number_of_facets=100,
             ...     colors_by_index=colors,
             ...     facet_result=result,
-            ...     img_color_indices=color_map
+            ...     img_color_indices=color_map,
+            ...     on_update=lambda p: print(f"Progress: {p*100:.0f}%")
             ... )
         """
         visited_cache = BooleanArray2D(facet_result.width, facet_result.height)
@@ -72,7 +76,8 @@ class FacetReducer:
             facet_processing_order.reverse()
 
         # First pass: remove facets below threshold
-        for fidx in facet_processing_order:
+        cur_time = time.time()
+        for idx, fidx in enumerate(facet_processing_order):
             f = facet_result.facets[fidx]
             if f is not None and f.pointCount < smaller_than:
                 FacetReducer._delete_facet(
@@ -83,8 +88,15 @@ class FacetReducer:
                     visited_cache
                 )
 
+                # Update progress every 500ms
+                if on_update is not None and time.time() - cur_time > 0.5:
+                    cur_time = time.time()
+                    on_update(0.5 * idx / len(facet_processing_order))
+
         # Second pass: enforce maximum facet count
         facet_count = sum(1 for f in facet_result.facets if f is not None)
+        start_facet_count = facet_count
+
         while maximum_number_of_facets is not None and facet_count > maximum_number_of_facets:
             # Re-evaluate order to remove smallest
             facet_processing_order = [
@@ -106,6 +118,16 @@ class FacetReducer:
                 )
 
             facet_count = sum(1 for f in facet_result.facets if f is not None)
+
+            # Update progress every 500ms
+            if on_update is not None and time.time() - cur_time > 0.5:
+                cur_time = time.time()
+                progress = 0.5 + 0.5 * (1.0 - (facet_count - maximum_number_of_facets) / (start_facet_count - maximum_number_of_facets))
+                on_update(progress)
+
+        # Final progress update
+        if on_update is not None:
+            on_update(1.0)
 
     @staticmethod
     def _delete_facet(
@@ -207,7 +229,7 @@ class FacetReducer:
             neighbour = facet_result.facets[neighbour_idx]
             if neighbour is not None:
                 for bpt in neighbour.borderPoints:
-                    distance = bpt.distance_to(Point(x, y))
+                    distance = bpt.distance_to_coord(x, y)
 
                     if distance < min_distance:
                         min_distance = distance

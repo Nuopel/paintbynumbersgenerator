@@ -130,9 +130,9 @@ class PaintByNumbersPipeline:
                 settings.maximumNumberOfFacets,
                 color_map_result.colorsByIndex,
                 facet_result,
-                color_map_result.imgColorIndices
+                color_map_result.imgColorIndices,
+                on_update=lambda p: update("Reducing facets", p)
             )
-            update("Reducing facets", 1.0)
 
         # Stage 8: Trace borders
         update("Tracing borders", 0.0)
