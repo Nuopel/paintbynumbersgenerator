@@ -6,23 +6,6 @@ Generate paint-by-number images (vectorized with SVG) from any input image.
 
 This repository is a **modernized fork** of the original [Paint by Numbers Generator](https://github.com/drake7707/paintbynumbersgenerator). Significant refactoring work has been undertaken to improve code quality, maintainability, and testability.
 
-### Related Projects
-
-**Python Implementation:** A complete Python port of this project is now available at [paintbynumbers-python](https://github.com/Nuopel/paintbynumbers-python/tree/master), offering:
-- Full CLI and Python API
-- 11-stage processing pipeline
-- Multiple output formats (SVG, PNG, JPG)
-- 92% test coverage with 420+ tests
-- NumPy-optimized performance
-
-### Refactoring Project
-
-This repository has undergone extensive refactoring documented in the [`lots/`](./lots) directory:
-- **21 work packages (LOTs)** covering test infrastructure, utilities, core algorithms, and interfaces
-- **Systematic modernization** following a Work Breakdown Structure (WBS)
-- **Zero regression approach** with snapshot testing
-- See [`lots/PROJECT_README.md`](./lots/PROJECT_README.md) for complete refactoring documentation
-- See [`lots/SUMMARY.md`](./lots/SUMMARY.md) for project overview
 
 ---
 
@@ -255,11 +238,29 @@ For detailed implementation notes, see the [`lots/`](./lots) directory and the [
 
 **Python Version**: For a production-ready Python implementation with comprehensive tests and API, see [paintbynumbers-python](https://github.com/Nuopel/paintbynumbers-python/).
 
+### Related Projects
+
+**Python Implementation:** A complete Python port of this project is now available at [paintbynumbers-python](https://github.com/Nuopel/paintbynumbers-python/tree/master), offering:
+- Full CLI and Python API
+- 11-stage processing pipeline
+- Multiple output formats (SVG, PNG, JPG)
+- 92% test coverage with 420+ tests
+- NumPy-optimized performance
+
+### Refactoring Project
+
+This repository has undergone extensive refactoring documented in the [`lots/`](./lots) directory:
+- **21 work packages (LOTs)** covering test infrastructure, utilities, core algorithms, and interfaces
+- **Systematic modernization** following a Work Breakdown Structure (WBS)
+- **Zero regression approach** with snapshot testing
+- See [`lots/PROJECT_README.md`](./lots/PROJECT_README.md) for complete refactoring documentation
+- See [`lots/SUMMARY.md`](./lots/SUMMARY.md) for project overview
+
 ---
 
 ## Contributing
 
-Feel free to fork and make your own changes. If you're working on this refactoring project, please follow the Work Breakdown Structure documented in the `lots/` directory.
+Feel free to fork and make your own changes.
 
 ---
 
