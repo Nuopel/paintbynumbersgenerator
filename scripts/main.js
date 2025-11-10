@@ -4229,6 +4229,21 @@ define("main", ["require", "exports", "gui", "lib/clipboard"], function (require
         $("#btnDownloadPalettePNG").click(function () {
             (0, gui_2.downloadPalettePng)();
         });
+        // Toggle between fit-to-view and detail view
+        $("#btnToggleView").click(function () {
+            const container = $("#svgContainer");
+            const button = $("#btnToggleView");
+            if (container.hasClass("svg-fit-view")) {
+                // Switch to detail view
+                container.removeClass("svg-fit-view").addClass("svg-detail-view");
+                button.html('<i class="material-icons left">fit_screen</i>Switch to Fit View');
+            }
+            else {
+                // Switch to fit view
+                container.removeClass("svg-detail-view").addClass("svg-fit-view");
+                button.html('<i class="material-icons left">zoom_out_map</i>Switch to Detail View');
+            }
+        });
         $("#lnkTrivial").click(() => { (0, gui_2.loadExample)("imgTrivial"); return false; });
         $("#lnkSmall").click(() => { (0, gui_2.loadExample)("imgSmall"); return false; });
         $("#lnkMedium").click(() => { (0, gui_2.loadExample)("imgMedium"); return false; });
