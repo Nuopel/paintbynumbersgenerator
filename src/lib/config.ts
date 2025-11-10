@@ -1,4 +1,4 @@
-import { ColorSpace, CLUSTERING_DEFAULTS, FACET_THRESHOLDS, IMAGE_CONSTANTS, SEGMENTATION_CONSTANTS } from './constants';
+import { ColorSpace, CLUSTERING_DEFAULTS, FACET_THRESHOLDS, IMAGE_CONSTANTS, SEGMENTATION_CONSTANTS, SVG_CONSTANTS } from './constants';
 
 /**
  * Runtime configuration for the paint-by-numbers generator
@@ -42,6 +42,9 @@ export interface PaintByNumbersConfig {
 
   /** Random seed for reproducible results (0 = use current time) */
   randomSeed: number;
+
+  /** Starting number for color labels (0 or 1) */
+  labelStartNumber: number;
 }
 
 /**
@@ -61,6 +64,7 @@ export const DEFAULT_CONFIG: Readonly<PaintByNumbersConfig> = {
   resizeImageWidth: IMAGE_CONSTANTS.DEFAULT_RESIZE_WIDTH,
   resizeImageHeight: IMAGE_CONSTANTS.DEFAULT_RESIZE_HEIGHT,
   randomSeed: 0, // 0 = use current time
+  labelStartNumber: SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER,
 };
 
 /**

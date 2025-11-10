@@ -295,7 +295,7 @@ export class GUIProcessManager {
     /**
      *  Creates a vector based SVG image of the facets with the given configuration
      */
-    public static async createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor: string = SVG_CONSTANTS.DEFAULT_FONT_COLOR, onUpdate: ((progress: number) => void) | null = null) {
+    public static async createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor: string = SVG_CONSTANTS.DEFAULT_FONT_COLOR, labelStartNumber: number = SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER, onUpdate: ((progress: number) => void) | null = null) {
         const xmlns = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(xmlns, "svg");
         svg.setAttribute("width", sizeMultiplier * facetResult.width + "");
@@ -387,13 +387,14 @@ export class GUIProcessManager {
                 if (addColorLabels) {
                     const txt = document.createElementNS(xmlns, "text");
                     txt.setAttribute("font-family", "Tahoma");
-                    const nrOfDigits = (f.color + "").length;
+                    const labelNumber = f.color + labelStartNumber;
+                    const nrOfDigits = (labelNumber + "").length;
                     txt.setAttribute("font-size", (fontSize / nrOfDigits) + "");
                     txt.setAttribute("dominant-baseline", "middle");
                     txt.setAttribute("text-anchor", "middle");
                     txt.setAttribute("fill", fontColor);
 
-                    txt.textContent = f.color + "";
+                    txt.textContent = labelNumber + "";
 
                     const subsvg = document.createElementNS(xmlns, "svg");
                     subsvg.setAttribute("width", f.labelBounds.width * sizeMultiplier + "");
