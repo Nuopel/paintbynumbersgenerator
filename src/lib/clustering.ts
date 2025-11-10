@@ -122,15 +122,18 @@ export class KMeans {
     }
 
     // Assignment step: assign each point to nearest centroid
-    for (const point of this.points) {
-      let minDistance = Number.MAX_VALUE;
+    // Use squared distances to avoid expensive sqrt() calls
+    const pointsLen = this.points.length;
+    for (let p = 0; p < pointsLen; p++) {
+      const point = this.points[p];
+      let minDistanceSquared = Number.MAX_VALUE;
       let nearestCentroidIndex = -1;
 
       for (let k = 0; k < this.k; k++) {
-        const distance = this.centroids[k].distanceTo(point);
-        if (distance < minDistance) {
+        const distanceSquared = this.centroids[k].distanceSquaredTo(point);
+        if (distanceSquared < minDistanceSquared) {
           nearestCentroidIndex = k;
-          minDistance = distance;
+          minDistanceSquared = distanceSquared;
         }
       }
 
@@ -140,7 +143,8 @@ export class KMeans {
     // Update step: recalculate centroids
     let totalDistanceMoved = 0;
 
-    for (let k = 0; k < this.pointsPerCategory.length; k++) {
+    const clustersLen = this.pointsPerCategory.length;
+    for (let k = 0; k < clustersLen; k++) {
       const cluster = this.pointsPerCategory[k];
 
       if (cluster.length > 0) {
@@ -167,14 +171,14 @@ export class KMeans {
    * @returns Index of nearest cluster (0 to k-1)
    */
   public classify(point: Vector): number {
-    let minDistance = Number.MAX_VALUE;
+    let minDistanceSquared = Number.MAX_VALUE;
     let nearestIndex = 0;
 
     for (let k = 0; k < this.k; k++) {
-      const distance = this.centroids[k].distanceTo(point);
-      if (distance < minDistance) {
+      const distanceSquared = this.centroids[k].distanceSquaredTo(point);
+      if (distanceSquared < minDistanceSquared) {
         nearestIndex = k;
-        minDistance = distance;
+        minDistanceSquared = distanceSquared;
       }
     }
 

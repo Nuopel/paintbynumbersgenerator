@@ -87,6 +87,31 @@ define("lib/Vector", ["require", "exports"], function (require, exports) {
             this.tag = tag;
         }
         /**
+         * Calculate squared Euclidean distance to another vector
+         *
+         * Faster than distanceTo() when you only need to compare distances,
+         * as it avoids the expensive sqrt() operation.
+         *
+         * @param other - Vector to calculate distance to
+         * @returns Squared Euclidean distance between vectors
+         *
+         * @example
+         * ```typescript
+         * const v1 = new Vector([0, 0]);
+         * const v2 = new Vector([3, 4]);
+         * const distSq = v1.distanceSquaredTo(v2); // Returns 25
+         * ```
+         */
+        distanceSquaredTo(other) {
+            let sumSquares = 0;
+            const len = this.values.length;
+            for (let i = 0; i < len; i++) {
+                const diff = other.values[i] - this.values[i];
+                sumSquares += diff * diff;
+            }
+            return sumSquares;
+        }
+        /**
          * Calculate Euclidean distance to another vector
          *
          * @param other - Vector to calculate distance to
@@ -100,12 +125,7 @@ define("lib/Vector", ["require", "exports"], function (require, exports) {
          * ```
          */
         distanceTo(other) {
-            let sumSquares = 0;
-            for (let i = 0; i < this.values.length; i++) {
-                const diff = other.values[i] - this.values[i];
-                sumSquares += diff * diff;
-            }
-            return Math.sqrt(sumSquares);
+            return Math.sqrt(this.distanceSquaredTo(other));
         }
         /**
          * Calculate weighted average of multiple vectors
@@ -131,14 +151,18 @@ define("lib/Vector", ["require", "exports"], function (require, exports) {
             const dims = vectors[0].values.length;
             const values = new Array(dims).fill(0);
             let weightSum = 0;
-            for (const vec of vectors) {
-                weightSum += vec.weight;
+            const vecLen = vectors.length;
+            for (let v = 0; v < vecLen; v++) {
+                const vec = vectors[v];
+                const weight = vec.weight;
+                weightSum += weight;
+                const vecValues = vec.values;
                 for (let i = 0; i < dims; i++) {
-                    values[i] += vec.weight * vec.values[i];
+                    values[i] += weight * vecValues[i];
                 }
             }
             // Normalize by total weight
-            for (let i = 0; i < values.length; i++) {
+            for (let i = 0; i < dims; i++) {
                 values[i] /= weightSum;
             }
             return new Vector(values, weightSum);
@@ -315,21 +339,25 @@ define("lib/clustering", ["require", "exports", "lib/Vector", "lib/Vector"], fun
                 this.pointsPerCategory[i] = [];
             }
             // Assignment step: assign each point to nearest centroid
-            for (const point of this.points) {
-                let minDistance = Number.MAX_VALUE;
+            // Use squared distances to avoid expensive sqrt() calls
+            const pointsLen = this.points.length;
+            for (let p = 0; p < pointsLen; p++) {
+                const point = this.points[p];
+                let minDistanceSquared = Number.MAX_VALUE;
                 let nearestCentroidIndex = -1;
                 for (let k = 0; k < this.k; k++) {
-                    const distance = this.centroids[k].distanceTo(point);
-                    if (distance < minDistance) {
+                    const distanceSquared = this.centroids[k].distanceSquaredTo(point);
+                    if (distanceSquared < minDistanceSquared) {
                         nearestCentroidIndex = k;
-                        minDistance = distance;
+                        minDistanceSquared = distanceSquared;
                     }
                 }
                 this.pointsPerCategory[nearestCentroidIndex].push(point);
             }
             // Update step: recalculate centroids
             let totalDistanceMoved = 0;
-            for (let k = 0; k < this.pointsPerCategory.length; k++) {
+            const clustersLen = this.pointsPerCategory.length;
+            for (let k = 0; k < clustersLen; k++) {
                 const cluster = this.pointsPerCategory[k];
                 if (cluster.length > 0) {
                     // Calculate new centroid as weighted average
@@ -351,13 +379,13 @@ define("lib/clustering", ["require", "exports", "lib/Vector", "lib/Vector"], fun
          * @returns Index of nearest cluster (0 to k-1)
          */
         classify(point) {
-            let minDistance = Number.MAX_VALUE;
+            let minDistanceSquared = Number.MAX_VALUE;
             let nearestIndex = 0;
             for (let k = 0; k < this.k; k++) {
-                const distance = this.centroids[k].distanceTo(point);
-                if (distance < minDistance) {
+                const distanceSquared = this.centroids[k].distanceSquaredTo(point);
+                if (distanceSquared < minDistanceSquared) {
                     nearestIndex = k;
-                    minDistance = distance;
+                    minDistanceSquared = distanceSquared;
                 }
             }
             return nearestIndex;
@@ -791,12 +819,14 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                 // vectors of all the unique colors are built, time to cluster them
                 const kmeans = new clustering_1.KMeans(vectors, settings.kMeansNrOfClusters, random);
                 let curTime = new Date().getTime();
+                const progressUpdateInterval = constants_2.UPDATE_INTERVALS.PROGRESS_UPDATE_MS;
                 kmeans.step();
                 while (kmeans.currentDeltaDistanceDifference > settings.kMeansMinDeltaDifference) {
                     kmeans.step();
                     // update GUI at regular intervals
-                    if (new Date().getTime() - curTime > constants_2.UPDATE_INTERVALS.PROGRESS_UPDATE_MS) {
-                        curTime = new Date().getTime();
+                    const now = new Date().getTime();
+                    if (now - curTime > progressUpdateInterval) {
+                        curTime = now;
                         yield (0, common_1.delay)(0);
                         if (onUpdate != null) {
                             ColorReducer.updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, false);
@@ -815,11 +845,16 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
          *  Updates the image data from the current kmeans centroids and their respective associated colors (vectors)
          */
         static updateKmeansOutputImageData(kmeans, settings, pointsByColor, imgData, outputImgData, restrictToSpecifiedColors) {
-            for (let c = 0; c < kmeans.centroids.length; c++) {
+            const centroidsLen = kmeans.centroids.length;
+            const imgWidth = imgData.width;
+            for (let c = 0; c < centroidsLen; c++) {
                 // for each cluster centroid
                 const centroid = kmeans.centroids[c];
                 // points per category are the different unique colors belonging to that cluster
-                for (const v of kmeans.pointsPerCategory[c]) {
+                const pointsInCategory = kmeans.pointsPerCategory[c];
+                const pointsInCategoryLen = pointsInCategory.length;
+                for (let vi = 0; vi < pointsInCategoryLen; vi++) {
+                    const v = pointsInCategory[vi];
                     // determine the rgb color value of the cluster centroid
                     let rgb;
                     if (settings.kMeansClusteringColorSpace === settings_2.ClusteringColorSpace.RGB) {
@@ -841,11 +876,14 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     if (restrictToSpecifiedColors) {
                         if (settings.kMeansColorRestrictions.length > 0) {
                             // there are color restrictions, for each centroid find the color from the color restrictions that's the closest
-                            let minDistance = Number.MAX_VALUE;
+                            let minDistanceSquared = Number.MAX_VALUE;
                             let closestRestrictedColor = null;
-                            for (const color of settings.kMeansColorRestrictions) {
+                            // Cache centroid lab conversion outside the loop
+                            const centroidLab = (0, colorconversion_1.rgb2lab)(rgb);
+                            const restrictionsLen = settings.kMeansColorRestrictions.length;
+                            for (let ci = 0; ci < restrictionsLen; ci++) {
+                                const color = settings.kMeansColorRestrictions[ci];
                                 // RGB distance is not very good for the human eye perception, convert both to lab and then calculate the distance
-                                const centroidLab = (0, colorconversion_1.rgb2lab)(rgb);
                                 let restrictionLab;
                                 if (typeof color === "string") {
                                     restrictionLab = (0, colorconversion_1.rgb2lab)(settings.colorAliases[color]);
@@ -853,11 +891,13 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                                 else {
                                     restrictionLab = (0, colorconversion_1.rgb2lab)(color);
                                 }
-                                const distance = Math.sqrt((centroidLab[0] - restrictionLab[0]) * (centroidLab[0] - restrictionLab[0]) +
-                                    (centroidLab[1] - restrictionLab[1]) * (centroidLab[1] - restrictionLab[1]) +
-                                    (centroidLab[2] - restrictionLab[2]) * (centroidLab[2] - restrictionLab[2]));
-                                if (distance < minDistance) {
-                                    minDistance = distance;
+                                // Use squared distance to avoid expensive sqrt
+                                const d0 = centroidLab[0] - restrictionLab[0];
+                                const d1 = centroidLab[1] - restrictionLab[1];
+                                const d2 = centroidLab[2] - restrictionLab[2];
+                                const distanceSquared = d0 * d0 + d1 * d1 + d2 * d2;
+                                if (distanceSquared < minDistanceSquared) {
+                                    minDistanceSquared = distanceSquared;
                                     closestRestrictedColor = color;
                                 }
                             }
@@ -875,34 +915,46 @@ define("colorreductionmanagement", ["require", "exports", "common", "lib/cluster
                     let pointRGB = v.tag;
                     // replace all pixels of the old color by the new centroid color
                     const pointColor = `${Math.floor(pointRGB[0])},${Math.floor(pointRGB[1])},${Math.floor(pointRGB[2])}`;
-                    for (const pt of pointsByColor[pointColor]) {
-                        const ptx = pt % imgData.width;
-                        const pty = Math.floor(pt / imgData.width);
-                        let dataOffset = (pty * imgData.width + ptx) * 4;
-                        outputImgData.data[dataOffset++] = rgb[0];
-                        outputImgData.data[dataOffset++] = rgb[1];
-                        outputImgData.data[dataOffset++] = rgb[2];
+                    const points = pointsByColor[pointColor];
+                    const pointsLen = points.length;
+                    const outputData = outputImgData.data;
+                    const r = rgb[0];
+                    const g = rgb[1];
+                    const b = rgb[2];
+                    for (let pi = 0; pi < pointsLen; pi++) {
+                        const pt = points[pi];
+                        const ptx = pt % imgWidth;
+                        const pty = Math.floor(pt / imgWidth);
+                        let dataOffset = (pty * imgWidth + ptx) * 4;
+                        outputData[dataOffset++] = r;
+                        outputData[dataOffset++] = g;
+                        outputData[dataOffset++] = b;
                     }
                 }
             }
         }
         /**
          *  Builds a distance matrix for each color to each other
+         *  Note: Uses squared distances for performance (avoids sqrt)
+         *  This is fine since the matrix is only used for comparisons
          */
         static buildColorDistanceMatrix(colorsByIndex) {
-            const colorDistances = new Array(colorsByIndex.length);
-            for (let j = 0; j < colorsByIndex.length; j++) {
-                colorDistances[j] = new Array(colorDistances.length);
+            const len = colorsByIndex.length;
+            const colorDistances = new Array(len);
+            for (let j = 0; j < len; j++) {
+                colorDistances[j] = new Array(len);
             }
-            for (let j = 0; j < colorsByIndex.length; j++) {
-                for (let i = j; i < colorsByIndex.length; i++) {
-                    const c1 = colorsByIndex[j];
+            for (let j = 0; j < len; j++) {
+                const c1 = colorsByIndex[j];
+                for (let i = j; i < len; i++) {
                     const c2 = colorsByIndex[i];
-                    const distance = Math.sqrt((c1[0] - c2[0]) * (c1[0] - c2[0]) +
-                        (c1[1] - c2[1]) * (c1[1] - c2[1]) +
-                        (c1[2] - c2[2]) * (c1[2] - c2[2]));
-                    colorDistances[i][j] = distance;
-                    colorDistances[j][i] = distance;
+                    // Use squared distance to avoid expensive sqrt
+                    const dr = c1[0] - c2[0];
+                    const dg = c1[1] - c2[1];
+                    const db = c1[2] - c2[2];
+                    const distanceSquared = dr * dr + dg * dg + db * db;
+                    colorDistances[i][j] = distanceSquared;
+                    colorDistances[j][i] = distanceSquared;
                 }
             }
             return colorDistances;
@@ -2505,16 +2557,19 @@ define("facetReducer", ["require", "exports", "colorreductionmanagement", "commo
                     facetProcessingOrder.reverse();
                 }
                 let curTime = new Date().getTime();
-                for (let fidx = 0; fidx < facetProcessingOrder.length; fidx++) {
+                const facetProcessingOrderLen = facetProcessingOrder.length;
+                const progressUpdateInterval = constants_4.UPDATE_INTERVALS.PROGRESS_UPDATE_MS;
+                for (let fidx = 0; fidx < facetProcessingOrderLen; fidx++) {
                     const f = facetResult.facets[facetProcessingOrder[fidx]];
                     // facets can be removed by merging by others due to a previous facet deletion
                     if (f != null && f.pointCount < smallerThan) {
                         FacetReducer.deleteFacet(f.id, facetResult, imgColorIndices, colorDistances, visitedCache);
-                        if (new Date().getTime() - curTime > constants_4.UPDATE_INTERVALS.PROGRESS_UPDATE_MS) {
-                            curTime = new Date().getTime();
+                        const now = new Date().getTime();
+                        if (now - curTime > progressUpdateInterval) {
+                            curTime = now;
                             yield (0, common_4.delay)(0);
                             if (onUpdate != null) {
-                                onUpdate(0.5 * fidx / facetProcessingOrder.length);
+                                onUpdate(0.5 * fidx / facetProcessingOrderLen);
                             }
                         }
                     }
@@ -2676,15 +2731,26 @@ define("facetReducer", ["require", "exports", "colorreductionmanagement", "commo
             }
             // determine which neighbour will receive the current point based on the distance, and if there are more with the same
             // distance, then take the neighbour with the closes color
-            for (const neighbourIdx of facetToRemove.neighbourFacets) {
+            const neighbourFacets = facetToRemove.neighbourFacets;
+            const neighbourFacetsLen = neighbourFacets.length;
+            for (let n = 0; n < neighbourFacetsLen; n++) {
+                const neighbourIdx = neighbourFacets[n];
                 const neighbour = facetResult.facets[neighbourIdx];
                 if (neighbour != null) {
-                    for (const bpt of neighbour.borderPoints) {
-                        const distance = bpt.distanceToCoord(x, y);
+                    const borderPoints = neighbour.borderPoints;
+                    const borderPointsLen = borderPoints.length;
+                    for (let b = 0; b < borderPointsLen; b++) {
+                        const bpt = borderPoints[b];
+                        // Use Manhattan distance (same as Point.distanceToCoord)
+                        const distance = Math.abs(bpt.x - x) + Math.abs(bpt.y - y);
                         if (distance < minDistance) {
                             minDistance = distance;
                             closestNeighbour = neighbourIdx;
                             minColorDistance = Number.MAX_VALUE; // reset color distance
+                            // Early exit if we found a distance of 0 (same pixel)
+                            if (distance === 0) {
+                                return closestNeighbour;
+                            }
                         }
                         else if (distance === minDistance) {
                             // if the distance is equal as the min distance

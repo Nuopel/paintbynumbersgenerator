@@ -120,14 +120,16 @@ export class ColorReducer {
         const kmeans = new KMeans(vectors, settings.kMeansNrOfClusters, random);
 
         let curTime = new Date().getTime();
+        const progressUpdateInterval = UPDATE_INTERVALS.PROGRESS_UPDATE_MS;
 
         kmeans.step();
         while (kmeans.currentDeltaDistanceDifference > settings.kMeansMinDeltaDifference) {
             kmeans.step();
 
             // update GUI at regular intervals
-            if (new Date().getTime() - curTime > UPDATE_INTERVALS.PROGRESS_UPDATE_MS) {
-                curTime = new Date().getTime();
+            const now = new Date().getTime();
+            if (now - curTime > progressUpdateInterval) {
+                curTime = now;
 
                 await delay(0);
                 if (onUpdate != null) {
@@ -151,12 +153,17 @@ export class ColorReducer {
      */
     public static updateKmeansOutputImageData(kmeans: KMeans, settings: Settings, pointsByColor: IMap<number[]>, imgData: ImageData, outputImgData: ImageData, restrictToSpecifiedColors: boolean) {
 
-        for (let c: number = 0; c < kmeans.centroids.length; c++) {
+        const centroidsLen = kmeans.centroids.length;
+        const imgWidth = imgData.width;
+        for (let c: number = 0; c < centroidsLen; c++) {
             // for each cluster centroid
             const centroid = kmeans.centroids[c];
 
             // points per category are the different unique colors belonging to that cluster
-            for (const v of kmeans.pointsPerCategory[c]) {
+            const pointsInCategory = kmeans.pointsPerCategory[c];
+            const pointsInCategoryLen = pointsInCategory.length;
+            for (let vi = 0; vi < pointsInCategoryLen; vi++) {
+                const v = pointsInCategory[vi];
 
                 // determine the rgb color value of the cluster centroid
                 let rgb: number[];
@@ -178,11 +185,14 @@ export class ColorReducer {
                 if (restrictToSpecifiedColors) {
                     if (settings.kMeansColorRestrictions.length > 0) {
                         // there are color restrictions, for each centroid find the color from the color restrictions that's the closest
-                        let minDistance = Number.MAX_VALUE;
+                        let minDistanceSquared = Number.MAX_VALUE;
                         let closestRestrictedColor: RGB | string | null = null;
-                        for (const color of settings.kMeansColorRestrictions) {
+                        // Cache centroid lab conversion outside the loop
+                        const centroidLab = rgb2lab(rgb);
+                        const restrictionsLen = settings.kMeansColorRestrictions.length;
+                        for (let ci = 0; ci < restrictionsLen; ci++) {
+                            const color = settings.kMeansColorRestrictions[ci];
                             // RGB distance is not very good for the human eye perception, convert both to lab and then calculate the distance
-                            const centroidLab = rgb2lab(rgb);
 
                             let restrictionLab: number[];
                             if (typeof color === "string") {
@@ -191,11 +201,13 @@ export class ColorReducer {
                                 restrictionLab = rgb2lab(color);
                             }
 
-                            const distance = Math.sqrt((centroidLab[0] - restrictionLab[0]) * (centroidLab[0] - restrictionLab[0]) +
-                                (centroidLab[1] - restrictionLab[1]) * (centroidLab[1] - restrictionLab[1]) +
-                                (centroidLab[2] - restrictionLab[2]) * (centroidLab[2] - restrictionLab[2]));
-                            if (distance < minDistance) {
-                                minDistance = distance;
+                            // Use squared distance to avoid expensive sqrt
+                            const d0 = centroidLab[0] - restrictionLab[0];
+                            const d1 = centroidLab[1] - restrictionLab[1];
+                            const d2 = centroidLab[2] - restrictionLab[2];
+                            const distanceSquared = d0 * d0 + d1 * d1 + d2 * d2;
+                            if (distanceSquared < minDistanceSquared) {
+                                minDistanceSquared = distanceSquared;
                                 closestRestrictedColor = color;
                             }
                         }
@@ -214,13 +226,20 @@ export class ColorReducer {
 
                 // replace all pixels of the old color by the new centroid color
                 const pointColor = `${Math.floor(pointRGB[0])},${Math.floor(pointRGB[1])},${Math.floor(pointRGB[2])}`;
-                for (const pt of pointsByColor[pointColor]) {
-                    const ptx = pt % imgData.width;
-                    const pty = Math.floor(pt / imgData.width);
-                    let dataOffset = (pty * imgData.width + ptx) * 4;
-                    outputImgData.data[dataOffset++] = rgb[0];
-                    outputImgData.data[dataOffset++] = rgb[1];
-                    outputImgData.data[dataOffset++] = rgb[2];
+                const points = pointsByColor[pointColor];
+                const pointsLen = points.length;
+                const outputData = outputImgData.data;
+                const r = rgb[0];
+                const g = rgb[1];
+                const b = rgb[2];
+                for (let pi = 0; pi < pointsLen; pi++) {
+                    const pt = points[pi];
+                    const ptx = pt % imgWidth;
+                    const pty = Math.floor(pt / imgWidth);
+                    let dataOffset = (pty * imgWidth + ptx) * 4;
+                    outputData[dataOffset++] = r;
+                    outputData[dataOffset++] = g;
+                    outputData[dataOffset++] = b;
                 }
             }
         }
@@ -228,21 +247,26 @@ export class ColorReducer {
 
     /**
      *  Builds a distance matrix for each color to each other
+     *  Note: Uses squared distances for performance (avoids sqrt)
+     *  This is fine since the matrix is only used for comparisons
      */
     public static buildColorDistanceMatrix(colorsByIndex: RGB[]) {
-        const colorDistances: number[][] = new Array(colorsByIndex.length);
-        for (let j: number = 0; j < colorsByIndex.length; j++) {
-            colorDistances[j] = new Array(colorDistances.length);
+        const len = colorsByIndex.length;
+        const colorDistances: number[][] = new Array(len);
+        for (let j: number = 0; j < len; j++) {
+            colorDistances[j] = new Array(len);
         }
-        for (let j: number = 0; j < colorsByIndex.length; j++) {
-            for (let i: number = j; i < colorsByIndex.length; i++) {
-                const c1 = colorsByIndex[j];
+        for (let j: number = 0; j < len; j++) {
+            const c1 = colorsByIndex[j];
+            for (let i: number = j; i < len; i++) {
                 const c2 = colorsByIndex[i];
-                const distance = Math.sqrt((c1[0] - c2[0]) * (c1[0] - c2[0]) +
-                    (c1[1] - c2[1]) * (c1[1] - c2[1]) +
-                    (c1[2] - c2[2]) * (c1[2] - c2[2]));
-                colorDistances[i][j] = distance;
-                colorDistances[j][i] = distance;
+                // Use squared distance to avoid expensive sqrt
+                const dr = c1[0] - c2[0];
+                const dg = c1[1] - c2[1];
+                const db = c1[2] - c2[2];
+                const distanceSquared = dr * dr + dg * dg + db * db;
+                colorDistances[i][j] = distanceSquared;
+                colorDistances[j][i] = distanceSquared;
             }
         }
         return colorDistances;

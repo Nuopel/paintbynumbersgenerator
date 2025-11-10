@@ -43,6 +43,32 @@ export class Vector {
   }
 
   /**
+   * Calculate squared Euclidean distance to another vector
+   *
+   * Faster than distanceTo() when you only need to compare distances,
+   * as it avoids the expensive sqrt() operation.
+   *
+   * @param other - Vector to calculate distance to
+   * @returns Squared Euclidean distance between vectors
+   *
+   * @example
+   * ```typescript
+   * const v1 = new Vector([0, 0]);
+   * const v2 = new Vector([3, 4]);
+   * const distSq = v1.distanceSquaredTo(v2); // Returns 25
+   * ```
+   */
+  public distanceSquaredTo(other: Vector): number {
+    let sumSquares = 0;
+    const len = this.values.length;
+    for (let i = 0; i < len; i++) {
+      const diff = other.values[i] - this.values[i];
+      sumSquares += diff * diff;
+    }
+    return sumSquares;
+  }
+
+  /**
    * Calculate Euclidean distance to another vector
    *
    * @param other - Vector to calculate distance to
@@ -56,12 +82,7 @@ export class Vector {
    * ```
    */
   public distanceTo(other: Vector): number {
-    let sumSquares = 0;
-    for (let i = 0; i < this.values.length; i++) {
-      const diff = other.values[i] - this.values[i];
-      sumSquares += diff * diff;
-    }
-    return Math.sqrt(sumSquares);
+    return Math.sqrt(this.distanceSquaredTo(other));
   }
 
   /**
@@ -90,15 +111,19 @@ export class Vector {
     const values: number[] = new Array(dims).fill(0);
 
     let weightSum = 0;
-    for (const vec of vectors) {
-      weightSum += vec.weight;
+    const vecLen = vectors.length;
+    for (let v = 0; v < vecLen; v++) {
+      const vec = vectors[v];
+      const weight = vec.weight;
+      weightSum += weight;
+      const vecValues = vec.values;
       for (let i = 0; i < dims; i++) {
-        values[i] += vec.weight * vec.values[i];
+        values[i] += weight * vecValues[i];
       }
     }
 
     // Normalize by total weight
-    for (let i = 0; i < values.length; i++) {
+    for (let i = 0; i < dims; i++) {
       values[i] /= weightSum;
     }
 

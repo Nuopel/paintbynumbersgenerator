@@ -27,17 +27,20 @@ export class FacetReducer {
         }
 
         let curTime = new Date().getTime();
-        for (let fidx: number = 0; fidx < facetProcessingOrder.length; fidx++) {
+        const facetProcessingOrderLen = facetProcessingOrder.length;
+        const progressUpdateInterval = UPDATE_INTERVALS.PROGRESS_UPDATE_MS;
+        for (let fidx: number = 0; fidx < facetProcessingOrderLen; fidx++) {
             const f = facetResult.facets[facetProcessingOrder[fidx]];
             // facets can be removed by merging by others due to a previous facet deletion
             if (f != null && f.pointCount < smallerThan) {
                 FacetReducer.deleteFacet(f.id, facetResult, imgColorIndices, colorDistances, visitedCache);
 
-                if (new Date().getTime() - curTime > UPDATE_INTERVALS.PROGRESS_UPDATE_MS) {
-                    curTime = new Date().getTime();
+                const now = new Date().getTime();
+                if (now - curTime > progressUpdateInterval) {
+                    curTime = now;
                     await delay(0);
                     if (onUpdate != null) {
-                        onUpdate(0.5 * fidx / facetProcessingOrder.length);
+                        onUpdate(0.5 * fidx / facetProcessingOrderLen);
                     }
                 }
             }
@@ -215,15 +218,26 @@ export class FacetReducer {
         }
         // determine which neighbour will receive the current point based on the distance, and if there are more with the same
         // distance, then take the neighbour with the closes color
-        for (const neighbourIdx of facetToRemove.neighbourFacets!) {
+        const neighbourFacets = facetToRemove.neighbourFacets!;
+        const neighbourFacetsLen = neighbourFacets.length;
+        for (let n = 0; n < neighbourFacetsLen; n++) {
+            const neighbourIdx = neighbourFacets[n];
             const neighbour = facetResult.facets[neighbourIdx];
             if (neighbour != null) {
-                for (const bpt of neighbour.borderPoints) {
-                    const distance = bpt.distanceToCoord(x, y);
+                const borderPoints = neighbour.borderPoints;
+                const borderPointsLen = borderPoints.length;
+                for (let b = 0; b < borderPointsLen; b++) {
+                    const bpt = borderPoints[b];
+                    // Use Manhattan distance (same as Point.distanceToCoord)
+                    const distance = Math.abs(bpt.x - x) + Math.abs(bpt.y - y);
                     if (distance < minDistance) {
                         minDistance = distance;
                         closestNeighbour = neighbourIdx;
                         minColorDistance = Number.MAX_VALUE; // reset color distance
+                        // Early exit if we found a distance of 0 (same pixel)
+                        if (distance === 0) {
+                            return closestNeighbour;
+                        }
                     } else if (distance === minDistance) {
                         // if the distance is equal as the min distance
                         // then see if the neighbour's color is closer to the current color
