@@ -1,5 +1,5 @@
 import { RGB } from "./common";
-import { CLUSTERING_DEFAULTS, FACET_THRESHOLDS, IMAGE_CONSTANTS, SEGMENTATION_CONSTANTS } from "./lib/constants";
+import { CLUSTERING_DEFAULTS, FACET_THRESHOLDS, IMAGE_CONSTANTS, SEGMENTATION_CONSTANTS, SVG_CONSTANTS } from "./lib/constants";
 
 export enum ClusteringColorSpace {
     RGB = 0,
@@ -29,4 +29,6 @@ export class Settings {
     public resizeImageHeight: number = IMAGE_CONSTANTS.DEFAULT_RESIZE_HEIGHT;
 
     public randomSeed: number = new Date().getTime();
+
+    public labelStartNumber: number = SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER;
 }

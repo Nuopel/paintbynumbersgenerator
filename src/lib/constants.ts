@@ -127,6 +127,9 @@ export const SVG_CONSTANTS = {
 
   /** Default stroke width for paths */
   DEFAULT_STROKE_WIDTH: 1,
+
+  /** Default starting number for color labels (0 or 1) */
+  DEFAULT_LABEL_START_NUMBER: 0,
 } as const;
 
 /**

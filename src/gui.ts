@@ -60,6 +60,8 @@ export function parseSettings(): Settings {
     settings.resizeImageWidth = parseInt($("#txtResizeWidth").val() + "");
     settings.resizeImageHeight = parseInt($("#txtResizeHeight").val() + "");
 
+    settings.labelStartNumber = parseInt($("#txtLabelStartNumber").val() + "") || 0;
+
     const restrictedColorLines = ($("#txtKMeansColorRestrictions").val() + "").split("\n");
     for (const line of restrictedColorLines) {
         const tline = line.trim();
@@ -114,13 +116,14 @@ export async function updateOutput() {
         const fontSize = parseInt($("#txtLabelFontSize").val() + "");
 
         const fontColor = $("#txtLabelFontColor").val() + "";
+        const labelStartNumber = parseInt($("#txtLabelStartNumber").val() + "") || 0;
 
         $("#statusSVGGenerate").css("width", "0%");
 
         $(".status.SVGGenerate").removeClass("complete");
         $(".status.SVGGenerate").addClass("active");
 
-        const svg = await GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, (progress) => {
+        const svg = await GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, labelStartNumber, (progress) => {
             if (cancellationToken.isCancelled) { throw new Error("Cancelled"); }
             $("#statusSVGGenerate").css("width", Math.round(progress * 100) + "%");
         });
@@ -141,17 +144,18 @@ export async function updateOutput() {
         }
 
         $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex));
+        $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex, labelStartNumber));
         ($("#palette .color") as any).tooltip();
         $(".status").removeClass("active");
         $(".status.SVGGenerate").addClass("complete");
     }
 }
 
-function createPaletteHtml(colorsByIndex: RGB[]) {
+function createPaletteHtml(colorsByIndex: RGB[], labelStartNumber: number = 0) {
     let html = "";
     for (let c: number = 0; c < colorsByIndex.length; c++) {
         const style = "background-color: " + `rgb(${colorsByIndex[c][0]},${colorsByIndex[c][1]},${colorsByIndex[c][2]})`;
-        html += `<div class="color" class="tooltipped" style="${style}" data-tooltip="${colorsByIndex[c][0]},${colorsByIndex[c][1]},${colorsByIndex[c][2]}">${c}</div>`;
+        html += `<div class="color" class="tooltipped" style="${style}" data-tooltip="${colorsByIndex[c][0]},${colorsByIndex[c][1]},${colorsByIndex[c][2]}">${c + labelStartNumber}</div>`;
     }
     return $(html);
 }
@@ -159,6 +163,7 @@ function createPaletteHtml(colorsByIndex: RGB[]) {
 export function downloadPalettePng() {
     if (processResult == null) { return; }
     const colorsByIndex: RGB[] = processResult.colorsByIndex;
+    const labelStartNumber = parseInt($("#txtLabelStartNumber").val() + "") || 0;
 
     const canvas = document.createElement("canvas");
 
@@ -186,7 +191,7 @@ export function downloadPalettePng() {
         ctx.strokeStyle = "#888";
         ctx.strokeRect(x, y, cellWidth, cellHeight - 20);
 
-        const nrText = i + "";
+        const nrText = (i + labelStartNumber) + "";
         ctx.fillStyle = "black";
         ctx.strokeStyle = "#CCC";
         ctx.font = "20px Tahoma";

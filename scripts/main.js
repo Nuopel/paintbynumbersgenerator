@@ -624,6 +624,8 @@ define("lib/constants", ["require", "exports", "settings"], function (require, e
         DEFAULT_FONT_COLOR: "black",
         /** Default stroke width for paths */
         DEFAULT_STROKE_WIDTH: 1,
+        /** Default starting number for color labels (0 or 1) */
+        DEFAULT_LABEL_START_NUMBER: 0,
     };
     /**
      * Random seed constants
@@ -659,6 +661,7 @@ define("settings", ["require", "exports", "lib/constants"], function (require, e
             this.resizeImageWidth = constants_1.IMAGE_CONSTANTS.DEFAULT_RESIZE_WIDTH;
             this.resizeImageHeight = constants_1.IMAGE_CONSTANTS.DEFAULT_RESIZE_HEIGHT;
             this.randomSeed = new Date().getTime();
+            this.labelStartNumber = constants_1.SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER;
         }
     }
     exports.Settings = Settings;
@@ -3678,7 +3681,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
          *  Creates a vector based SVG image of the facets with the given configuration
          */
         static createSVG(facetResult_1, colorsByIndex_1, sizeMultiplier_1, fill_2, stroke_1, addColorLabels_1) {
-            return __awaiter(this, arguments, void 0, function* (facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = constants_5.SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor = constants_5.SVG_CONSTANTS.DEFAULT_FONT_COLOR, onUpdate = null) {
+            return __awaiter(this, arguments, void 0, function* (facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = constants_5.SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor = constants_5.SVG_CONSTANTS.DEFAULT_FONT_COLOR, labelStartNumber = constants_5.SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER, onUpdate = null) {
                 const xmlns = "http://www.w3.org/2000/svg";
                 const svg = document.createElementNS(xmlns, "svg");
                 svg.setAttribute("width", sizeMultiplier * facetResult.width + "");
@@ -3764,12 +3767,13 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                         if (addColorLabels) {
                             const txt = document.createElementNS(xmlns, "text");
                             txt.setAttribute("font-family", "Tahoma");
-                            const nrOfDigits = (f.color + "").length;
+                            const labelNumber = f.color + labelStartNumber;
+                            const nrOfDigits = (labelNumber + "").length;
                             txt.setAttribute("font-size", (fontSize / nrOfDigits) + "");
                             txt.setAttribute("dominant-baseline", "middle");
                             txt.setAttribute("text-anchor", "middle");
                             txt.setAttribute("fill", fontColor);
-                            txt.textContent = f.color + "";
+                            txt.textContent = labelNumber + "";
                             const subsvg = document.createElementNS(xmlns, "svg");
                             subsvg.setAttribute("width", f.labelBounds.width * sizeMultiplier + "");
                             subsvg.setAttribute("height", f.labelBounds.height * sizeMultiplier + "");
@@ -3860,6 +3864,7 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
         settings.resizeImageIfTooLarge = $("#chkResizeImage").prop("checked");
         settings.resizeImageWidth = parseInt($("#txtResizeWidth").val() + "");
         settings.resizeImageHeight = parseInt($("#txtResizeHeight").val() + "");
+        settings.labelStartNumber = parseInt($("#txtLabelStartNumber").val() + "") || 0;
         const restrictedColorLines = ($("#txtKMeansColorRestrictions").val() + "").split("\n");
         for (const line of restrictedColorLines) {
             const tline = line.trim();
@@ -3918,16 +3923,18 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
                 const sizeMultiplier = parseInt($("#txtSizeMultiplier").val() + "");
                 const fontSize = parseInt($("#txtLabelFontSize").val() + "");
                 const fontColor = $("#txtLabelFontColor").val() + "";
+                const labelStartNumber = parseInt($("#txtLabelStartNumber").val() + "") || 0;
                 $("#statusSVGGenerate").css("width", "0%");
                 $(".status.SVGGenerate").removeClass("complete");
                 $(".status.SVGGenerate").addClass("active");
-                const svg = yield guiprocessmanager_1.GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, (progress) => {
+                const svg = yield guiprocessmanager_1.GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, labelStartNumber, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
                     $("#statusSVGGenerate").css("width", Math.round(progress * 100) + "%");
                 });
                 $("#svgContainer").empty().append(svg);
+                $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex, labelStartNumber));
                 // Initialize SVG for fit-to-view mode (default mode)
                 const container = $("#svgContainer");
                 if (container.hasClass("svg-fit-view")) {
@@ -3948,11 +3955,11 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
             }
         });
     }
-    function createPaletteHtml(colorsByIndex) {
+    function createPaletteHtml(colorsByIndex, labelStartNumber = 0) {
         let html = "";
         for (let c = 0; c < colorsByIndex.length; c++) {
             const style = "background-color: " + `rgb(${colorsByIndex[c][0]},${colorsByIndex[c][1]},${colorsByIndex[c][2]})`;
-            html += `<div class="color" class="tooltipped" style="${style}" data-tooltip="${colorsByIndex[c][0]},${colorsByIndex[c][1]},${colorsByIndex[c][2]}">${c}</div>`;
+            html += `<div class="color" class="tooltipped" style="${style}" data-tooltip="${colorsByIndex[c][0]},${colorsByIndex[c][1]},${colorsByIndex[c][2]}">${c + labelStartNumber}</div>`;
         }
         return $(html);
     }
@@ -3961,6 +3968,7 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
             return;
         }
         const colorsByIndex = processResult.colorsByIndex;
+        const labelStartNumber = parseInt($("#txtLabelStartNumber").val() + "") || 0;
         const canvas = document.createElement("canvas");
         const nrOfItemsPerRow = 10;
         const nrRows = Math.ceil(colorsByIndex.length / nrOfItemsPerRow);
@@ -3981,7 +3989,7 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
             ctx.fillRect(x, y, cellWidth, cellHeight - 20);
             ctx.strokeStyle = "#888";
             ctx.strokeRect(x, y, cellWidth, cellHeight - 20);
-            const nrText = i + "";
+            const nrText = (i + labelStartNumber) + "";
             ctx.fillStyle = "black";
             ctx.strokeStyle = "#CCC";
             ctx.font = "20px Tahoma";
@@ -4230,7 +4238,7 @@ define("main", ["require", "exports", "gui", "lib/clipboard"], function (require
                 }
             });
         });
-        $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize, #txtLabelFontColor").change(() => __awaiter(this, void 0, void 0, function* () {
+        $("#chkShowLabels, #chkFillFacets, #chkShowBorders, #txtSizeMultiplier, #txtLabelFontSize, #txtLabelFontColor, #txtLabelStartNumber").change(() => __awaiter(this, void 0, void 0, function* () {
             yield (0, gui_2.updateOutput)();
         }));
         $("#btnDownloadSVG").click(function () {
@@ -4764,6 +4772,7 @@ define("lib/config", ["require", "exports", "lib/constants"], function (require,
         resizeImageWidth: constants_7.IMAGE_CONSTANTS.DEFAULT_RESIZE_WIDTH,
         resizeImageHeight: constants_7.IMAGE_CONSTANTS.DEFAULT_RESIZE_HEIGHT,
         randomSeed: 0, // 0 = use current time
+        labelStartNumber: constants_7.SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER,
     };
     /**
      * Merge user configuration with defaults
