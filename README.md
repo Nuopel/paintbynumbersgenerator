@@ -11,7 +11,7 @@ This repository is a **modernized fork** of the original [Paint by Numbers Gener
 
 ## Demo
 
-Try it out at [https://drake7707.github.io/paintbynumbersgenerator/index.html](https://drake7707.github.io/paintbynumbersgenerator/index.html)
+Try it out at [https://nuopel.github.io/paintbynumbersgenerator/index.html](https://nuopel.github.io/paintbynumbersgenerator/index.html)
 
 ---
 
