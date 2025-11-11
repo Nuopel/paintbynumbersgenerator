@@ -50,7 +50,27 @@
 }
 
 #svgContainer {
-    overflow: auto;
     max-width: 100%;
-    max-height: 500px;
+}
+
+/* Fit to view mode - shows entire SVG scaled to fit container */
+#svgContainer.svg-fit-view {
+    overflow: hidden;
+    max-height: 600px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#svgContainer.svg-fit-view svg {
+    max-width: 100% !important;
+    max-height: 600px !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+/* Detail view mode - scrollable, shows full resolution */
+#svgContainer.svg-detail-view {
+    overflow: auto;
+    max-height: 600px;
 }
