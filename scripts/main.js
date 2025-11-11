@@ -3928,6 +3928,19 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
                     $("#statusSVGGenerate").css("width", Math.round(progress * 100) + "%");
                 });
                 $("#svgContainer").empty().append(svg);
+                // Initialize SVG for fit-to-view mode (default mode)
+                const container = $("#svgContainer");
+                if (container.hasClass("svg-fit-view")) {
+                    const width = svg.getAttribute("width");
+                    const height = svg.getAttribute("height");
+                    if (width && height) {
+                        svg.setAttribute("data-original-width", width);
+                        svg.setAttribute("data-original-height", height);
+                        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+                        svg.removeAttribute("width");
+                        svg.removeAttribute("height");
+                    }
+                }
                 $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex));
                 $("#palette .color").tooltip();
                 $(".status").removeClass("active");
@@ -4233,15 +4246,41 @@ define("main", ["require", "exports", "gui", "lib/clipboard"], function (require
         $("#btnToggleView").click(function () {
             const container = $("#svgContainer");
             const button = $("#btnToggleView");
+            const svg = container.find("svg")[0];
             if (container.hasClass("svg-fit-view")) {
                 // Switch to detail view
                 container.removeClass("svg-fit-view").addClass("svg-detail-view");
                 button.html('<i class="material-icons left">fit_screen</i>Switch to Fit View');
+                // Restore original SVG dimensions for detail view
+                if (svg) {
+                    const origWidth = svg.getAttribute("data-original-width");
+                    const origHeight = svg.getAttribute("data-original-height");
+                    if (origWidth && origHeight) {
+                        svg.setAttribute("width", origWidth);
+                        svg.setAttribute("height", origHeight);
+                        svg.removeAttribute("viewBox");
+                    }
+                }
             }
             else {
                 // Switch to fit view
                 container.removeClass("svg-detail-view").addClass("svg-fit-view");
                 button.html('<i class="material-icons left">zoom_out_map</i>Switch to Detail View');
+                // Set up SVG for scaling in fit-to-view mode
+                if (svg) {
+                    const width = svg.getAttribute("width");
+                    const height = svg.getAttribute("height");
+                    if (width && height) {
+                        // Store original dimensions
+                        svg.setAttribute("data-original-width", width);
+                        svg.setAttribute("data-original-height", height);
+                        // Set viewBox to enable scaling
+                        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+                        // Remove fixed dimensions
+                        svg.removeAttribute("width");
+                        svg.removeAttribute("height");
+                    }
+                }
             }
         });
         $("#lnkTrivial").click(() => { (0, gui_2.loadExample)("imgTrivial"); return false; });

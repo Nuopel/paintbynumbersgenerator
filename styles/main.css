@@ -63,10 +63,10 @@
 }
 
 #svgContainer.svg-fit-view svg {
-    max-width: 100%;
-    max-height: 600px;
-    width: auto;
-    height: auto;
+    max-width: 100% !important;
+    max-height: 600px !important;
+    width: auto !important;
+    height: auto !important;
 }
 
 /* Detail view mode - scrollable, shows full resolution */

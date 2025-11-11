@@ -38,7 +38,7 @@
                 <canvas id="canvas"></canvas>
                 <img id="imgTrivial" crossorigin="anonymous" src="https://i.imgur.com/o5CqO57.png"
                     style="display:none" />
-                <img id="imgSmall" crossorigin="anonymous" src="https://i.imgur.com/S0D3kXZ.jpg" style="display:none" />
+                <img id="imgSmall" crossorigin="anonymous" src="https://i.imgur.com/YgYLDGP.png" style="display:none" />
 
                 <img id="imgMedium" crossorigin="anonymous" src="https://i.imgur.com/nLeNgYbr.jpg"
                     style="display:none" />
@@ -380,7 +380,12 @@
                 </div>
                 <div class="row">
                     <div class="col s12">
-                        <div id="svgContainer">
+                        <div style="margin-bottom: 10px;">
+                            <button class="waves-effect waves-light btn-small" id="btnToggleView">
+                                <i class="material-icons left">zoom_out_map</i>Switch to Detail View
+                            </button>
+                        </div>
+                        <div id="svgContainer" class="svg-fit-view">
 
                         </div>
                     </div>
@@ -408,11 +413,6 @@
             </div>
         </div>
     </div>
-    <div style="position:absolute;top:3px;right:3px;font-size:0.7em">
-        Created by
-        <a href="http://dwight.skyon.be/">drake7707</a>
-    </div>
-
 
     <script src="scripts/lib/saveSvgAsPng.js"></script>
     <script src="scripts/lib/require.js"></script>
