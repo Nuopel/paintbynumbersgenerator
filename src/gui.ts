@@ -128,6 +128,22 @@ export async function updateOutput() {
             $("#statusSVGGenerate").css("width", Math.round(progress * 100) + "%");
         });
         $("#svgContainer").empty().append(svg);
+
+        // Initialize SVG for fit-to-view mode (default mode)
+        const container = $("#svgContainer");
+        if (container.hasClass("svg-fit-view")) {
+            const width = svg.getAttribute("width");
+            const height = svg.getAttribute("height");
+            if (width && height) {
+                svg.setAttribute("data-original-width", width);
+                svg.setAttribute("data-original-height", height);
+                svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+                svg.removeAttribute("width");
+                svg.removeAttribute("height");
+            }
+        }
+
+        $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex));
         $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex, labelStartNumber));
         ($("#palette .color") as any).tooltip();
         $(".status").removeClass("active");
