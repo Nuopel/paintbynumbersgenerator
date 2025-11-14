@@ -662,6 +662,7 @@ define("settings", ["require", "exports", "lib/constants"], function (require, e
             this.resizeImageHeight = constants_1.IMAGE_CONSTANTS.DEFAULT_RESIZE_HEIGHT;
             this.randomSeed = new Date().getTime();
             this.labelStartNumber = constants_1.SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER;
+            this.strokeWidth = constants_1.SVG_CONSTANTS.DEFAULT_STROKE_WIDTH;
         }
     }
     exports.Settings = Settings;
@@ -3681,7 +3682,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
          *  Creates a vector based SVG image of the facets with the given configuration
          */
         static createSVG(facetResult_1, colorsByIndex_1, sizeMultiplier_1, fill_2, stroke_1, addColorLabels_1) {
-            return __awaiter(this, arguments, void 0, function* (facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = constants_5.SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor = constants_5.SVG_CONSTANTS.DEFAULT_FONT_COLOR, labelStartNumber = constants_5.SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER, onUpdate = null) {
+            return __awaiter(this, arguments, void 0, function* (facetResult, colorsByIndex, sizeMultiplier, fill, stroke, addColorLabels, fontSize = constants_5.SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor = constants_5.SVG_CONSTANTS.DEFAULT_FONT_COLOR, labelStartNumber = constants_5.SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER, strokeWidth = constants_5.SVG_CONSTANTS.DEFAULT_STROKE_WIDTH, onUpdate = null) {
                 const xmlns = "http://www.w3.org/2000/svg";
                 const svg = document.createElementNS(xmlns, "svg");
                 svg.setAttribute("width", sizeMultiplier * facetResult.width + "");
@@ -3732,7 +3733,7 @@ define("guiprocessmanager", ["require", "exports", "colorreductionmanagement", "
                                 svgPath.style.stroke = `rgb(${colorsByIndex[f.color][0]},${colorsByIndex[f.color][1]},${colorsByIndex[f.color][2]})`;
                             }
                         }
-                        svgPath.style.strokeWidth = "1px"; // Set stroke width
+                        svgPath.style.strokeWidth = strokeWidth + "px"; // Set stroke width
                         if (fill) {
                             svgPath.style.fill = `rgb(${colorsByIndex[f.color][0]},${colorsByIndex[f.color][1]},${colorsByIndex[f.color][2]})`;
                         }
@@ -3924,17 +3925,17 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
                 const fontSize = parseInt($("#txtLabelFontSize").val() + "");
                 const fontColor = $("#txtLabelFontColor").val() + "";
                 const labelStartNumber = parseInt($("#txtLabelStartNumber").val() + "") || 0;
+                const strokeWidth = parseFloat($("#txtLineWidth").val() + "") || 1;
                 $("#statusSVGGenerate").css("width", "0%");
                 $(".status.SVGGenerate").removeClass("complete");
                 $(".status.SVGGenerate").addClass("active");
-                const svg = yield guiprocessmanager_1.GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, labelStartNumber, (progress) => {
+                const svg = yield guiprocessmanager_1.GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, labelStartNumber, strokeWidth, (progress) => {
                     if (cancellationToken.isCancelled) {
                         throw new Error("Cancelled");
                     }
                     $("#statusSVGGenerate").css("width", Math.round(progress * 100) + "%");
                 });
                 $("#svgContainer").empty().append(svg);
-                $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex, labelStartNumber));
                 // Initialize SVG for fit-to-view mode (default mode)
                 const container = $("#svgContainer");
                 if (container.hasClass("svg-fit-view")) {
@@ -3949,6 +3950,7 @@ define("gui", ["require", "exports", "common", "guiprocessmanager", "settings"],
                     }
                 }
                 $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex));
+                $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex, labelStartNumber));
                 $("#palette .color").tooltip();
                 $(".status").removeClass("active");
                 $(".status.SVGGenerate").addClass("complete");

@@ -24,6 +24,7 @@ class CLISettingsOutputProfile {
 
     public svgFontSize: number = 60;
     public svgFontColor: string = "black";
+    public svgStrokeWidth: number = 1;
 
     public filetype: "svg" | "png" | "jpg" = "svg";
     public filetypeQuality: number = 95;
@@ -159,7 +160,7 @@ async function main() {
         }
 
         const svgProfilePath = path.join(path.dirname(svgPath), path.basename(svgPath).substr(0, path.basename(svgPath).length - path.extname(svgPath).length) + "-" + profile.name) + "." + profile.filetype;
-        const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, profile.svgSizeMultiplier, profile.svgFillFacets, profile.svgShowBorders, profile.svgShowLabels, profile.svgFontSize, profile.svgFontColor);
+        const svgString = await createSVG(facetResult, colormapResult.colorsByIndex, profile.svgSizeMultiplier, profile.svgFillFacets, profile.svgShowBorders, profile.svgShowLabels, profile.svgFontSize, profile.svgFontColor, profile.svgStrokeWidth);
 
         if (profile.filetype === "svg") {
             fs.writeFileSync(svgProfilePath, svgString);
@@ -223,7 +224,7 @@ async function main() {
     fs.writeFileSync(palettePath, paletteInfo);
 }
 
-async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 60, fontColor: string = "black", onUpdate: ((progress: number) => void) | null = null) {
+async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = 60, fontColor: string = "black", strokeWidth: number = 1, onUpdate: ((progress: number) => void) | null = null) {
 
     let svgString = "";
     const xmlns = "http://www.w3.org/2000/svg";
@@ -285,7 +286,7 @@ async function createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMul
             svgPathString += `style="`;
             svgPathString += `fill: ${svgFill};`;
             if (svgStroke !== "") {
-                svgPathString += `stroke: ${svgStroke}; stroke-width:1px`;
+                svgPathString += `stroke: ${svgStroke}; stroke-width:${strokeWidth}px`;
             }
             svgPathString += `"`;
 

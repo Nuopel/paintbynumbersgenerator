@@ -117,13 +117,14 @@ export async function updateOutput() {
 
         const fontColor = $("#txtLabelFontColor").val() + "";
         const labelStartNumber = parseInt($("#txtLabelStartNumber").val() + "") || 0;
+        const strokeWidth = parseFloat($("#txtLineWidth").val() + "") || 1;
 
         $("#statusSVGGenerate").css("width", "0%");
 
         $(".status.SVGGenerate").removeClass("complete");
         $(".status.SVGGenerate").addClass("active");
 
-        const svg = await GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, labelStartNumber, (progress) => {
+        const svg = await GUIProcessManager.createSVG(processResult.facetResult, processResult.colorsByIndex, sizeMultiplier, fill, stroke, showLabels, fontSize, fontColor, labelStartNumber, strokeWidth, (progress) => {
             if (cancellationToken.isCancelled) { throw new Error("Cancelled"); }
             $("#statusSVGGenerate").css("width", Math.round(progress * 100) + "%");
         });

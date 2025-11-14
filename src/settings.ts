@@ -31,4 +31,5 @@ export class Settings {
     public randomSeed: number = new Date().getTime();
 
     public labelStartNumber: number = SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER;
+    public strokeWidth: number = SVG_CONSTANTS.DEFAULT_STROKE_WIDTH;
 }

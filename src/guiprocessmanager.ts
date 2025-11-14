@@ -295,7 +295,7 @@ export class GUIProcessManager {
     /**
      *  Creates a vector based SVG image of the facets with the given configuration
      */
-    public static async createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor: string = SVG_CONSTANTS.DEFAULT_FONT_COLOR, labelStartNumber: number = SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER, onUpdate: ((progress: number) => void) | null = null) {
+    public static async createSVG(facetResult: FacetResult, colorsByIndex: RGB[], sizeMultiplier: number, fill: boolean, stroke: boolean, addColorLabels: boolean, fontSize: number = SVG_CONSTANTS.DEFAULT_FONT_SIZE, fontColor: string = SVG_CONSTANTS.DEFAULT_FONT_COLOR, labelStartNumber: number = SVG_CONSTANTS.DEFAULT_LABEL_START_NUMBER, strokeWidth: number = SVG_CONSTANTS.DEFAULT_STROKE_WIDTH, onUpdate: ((progress: number) => void) | null = null) {
         const xmlns = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(xmlns, "svg");
         svg.setAttribute("width", sizeMultiplier * facetResult.width + "");
@@ -349,7 +349,7 @@ export class GUIProcessManager {
                         svgPath.style.stroke = `rgb(${colorsByIndex[f.color][0]},${colorsByIndex[f.color][1]},${colorsByIndex[f.color][2]})`;
                     }
                 }
-                svgPath.style.strokeWidth = "1px"; // Set stroke width
+                svgPath.style.strokeWidth = strokeWidth + "px"; // Set stroke width
 
                 if (fill) {
                     svgPath.style.fill = `rgb(${colorsByIndex[f.color][0]},${colorsByIndex[f.color][1]},${colorsByIndex[f.color][2]})`;
