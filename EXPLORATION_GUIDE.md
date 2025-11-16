@@ -22,33 +22,53 @@ The tool can vary the following parameters:
 
 ### Image Resolution
 - **`resizeImageWidth`**: Controls the maximum width of the processed image
-- Smaller values = faster processing, less detail
-- Larger values = slower processing, more detail
-- Recommended range: 512, 1024, 2048
+  - Smaller values = faster processing, less detail
+  - Larger values = slower processing, more detail
+  - Recommended range: 512, 1024, 2048
+
+- **`resizeImageHeight`**: Controls the maximum height of the processed image
+  - Usually set equal to width to maintain aspect ratio
+  - Can be set independently for specific aspect ratios
+  - Recommended range: 512, 1024, 2048
 
 ### Color Clustering
 - **`kMeansNrOfClusters`**: Number of colors in the final output
-- Fewer clusters = simpler image, larger regions
-- More clusters = more detail, smaller regions
-- Recommended range: 8, 16, 24, 32, 64
+  - Fewer clusters = simpler image, larger regions
+  - More clusters = more detail, smaller regions
+  - Recommended range: 8, 16, 24, 32, 64
 
-### Color Space
 - **`kMeansClusteringColorSpace`**: Color space used for clustering
   - `0` = RGB (standard color space)
   - `1` = HSL (Hue, Saturation, Lightness - perceptually uniform)
   - `2` = LAB (CIE Lab - most perceptually uniform, best for color accuracy)
 
 ### Facet Processing
-- **`removeFacetsSmallerThanNrOfPoints`**: Minimum size for colored regions
-- Smaller values = keep tiny details
-- Larger values = remove small artifacts
-- Recommended range: 5, 10, 20, 50, 100
+- **`removeFacetsSmallerThanNrOfPoints`**: Minimum size for colored regions (in pixels)
+  - Smaller values = keep tiny details
+  - Larger values = remove small artifacts
+  - Recommended range: 5, 10, 20, 50, 100
+
+- **`removeFacetsFromLargeToSmall`**: Order in which facets are removed (boolean)
+  - `true` = Process large facets first (prevents boundary warping, recommended)
+  - `false` = Process small facets first
+  - Default: `true`
+
+- **`maximumNumberOfFacets`**: Hard limit on the number of color regions
+  - Forces the image to have at most this many regions
+  - Useful for ensuring paint-by-number complexity stays manageable
+  - Use `Infinity` or a large number for no limit
+  - Recommended range: 50, 100, 200, 500
+
+- **`narrowPixelStripCleanupRuns`**: Number of iterations to remove thin colored lines
+  - `0` = no cleanup (faster, may have artifacts)
+  - Higher values = cleaner edges, but slower processing
+  - Recommended range: 0, 1, 3
 
 ### Border Smoothing
 - **`nrOfTimesToHalveBorderSegments`**: Number of border smoothing iterations
-- 0 = no smoothing (jagged edges)
-- Higher values = smoother curves
-- Recommended range: 0, 1, 2, 3, 5
+  - `0` = no smoothing (jagged edges)
+  - Higher values = smoother curves
+  - Recommended range: 0, 1, 2, 3, 5
 
 ## Configuration File Format
 
@@ -58,15 +78,19 @@ Create a JSON file with your desired parameter variations:
 {
   "variations": {
     "resizeImageWidth": [512, 1024, 2048],
+    "resizeImageHeight": [512, 1024, 2048],
     "kMeansNrOfClusters": [8, 16, 24, 32],
     "kMeansClusteringColorSpace": [0, 1, 2],
     "removeFacetsSmallerThanNrOfPoints": [10, 20, 50],
+    "removeFacetsFromLargeToSmall": [true, false],
+    "maximumNumberOfFacets": [100, 200, 500],
+    "narrowPixelStripCleanupRuns": [0, 1, 3],
     "nrOfTimesToHalveBorderSegments": [1, 2, 3]
   }
 }
 ```
 
-**Note**: The tool generates all possible combinations of the specified parameters. For example, the configuration above would generate 3 × 4 × 3 × 3 × 3 = 324 variations!
+**Note**: The tool generates all possible combinations of the specified parameters. For example, the configuration above would generate 3 × 3 × 4 × 3 × 3 × 2 × 3 × 3 × 3 = 52,488 variations! Start with fewer values per parameter to keep the number manageable.
 
 ### Managing Combination Explosion
 

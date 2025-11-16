@@ -19,9 +19,13 @@ interface ExplorationConfig {
     outputDir: string;
     variations: {
         resizeImageWidth?: number[];
+        resizeImageHeight?: number[];
         kMeansNrOfClusters?: number[];
         kMeansClusteringColorSpace?: ClusteringColorSpace[];
         removeFacetsSmallerThanNrOfPoints?: number[];
+        removeFacetsFromLargeToSmall?: boolean[];
+        maximumNumberOfFacets?: number[];
+        narrowPixelStripCleanupRuns?: number[];
         nrOfTimesToHalveBorderSegments?: number[];
     };
 }
@@ -37,6 +41,9 @@ interface ExplorationResult {
         nrOfClusters: number;
         colorSpace: string;
         facetThreshold: number;
+        facetOrderLargeToSmall: boolean;
+        maxFacets: number;
+        narrowPixelCleanup: number;
         borderSegments: number;
     };
 }
@@ -91,25 +98,40 @@ class ImageExplorer {
 
         // Get arrays for each parameter (use default if not specified)
         const resizeWidths = vars.resizeImageWidth || [this.baseSettings.resizeImageWidth];
+        const resizeHeights = vars.resizeImageHeight || [this.baseSettings.resizeImageHeight];
         const clusters = vars.kMeansNrOfClusters || [this.baseSettings.kMeansNrOfClusters];
         const colorSpaces = vars.kMeansClusteringColorSpace || [this.baseSettings.kMeansClusteringColorSpace];
         const facetThresholds = vars.removeFacetsSmallerThanNrOfPoints || [this.baseSettings.removeFacetsSmallerThanNrOfPoints];
+        const facetOrders = vars.removeFacetsFromLargeToSmall !== undefined ? vars.removeFacetsFromLargeToSmall : [this.baseSettings.removeFacetsFromLargeToSmall];
+        const maxFacets = vars.maximumNumberOfFacets || [this.baseSettings.maximumNumberOfFacets];
+        const narrowPixelRuns = vars.narrowPixelStripCleanupRuns !== undefined ? vars.narrowPixelStripCleanupRuns : [this.baseSettings.narrowPixelStripCleanupRuns];
         const borderSegments = vars.nrOfTimesToHalveBorderSegments || [this.baseSettings.nrOfTimesToHalveBorderSegments];
 
         // Generate all combinations using nested loops
         for (const width of resizeWidths) {
-            for (const cluster of clusters) {
-                for (const colorSpace of colorSpaces) {
-                    for (const facetThreshold of facetThresholds) {
-                        for (const borderSegment of borderSegments) {
-                            const settings = new Settings();
-                            settings.resizeImageWidth = width;
-                            settings.resizeImageHeight = width; // Keep aspect ratio
-                            settings.kMeansNrOfClusters = cluster;
-                            settings.kMeansClusteringColorSpace = colorSpace;
-                            settings.removeFacetsSmallerThanNrOfPoints = facetThreshold;
-                            settings.nrOfTimesToHalveBorderSegments = borderSegment;
-                            combinations.push(settings);
+            for (const height of resizeHeights) {
+                for (const cluster of clusters) {
+                    for (const colorSpace of colorSpaces) {
+                        for (const facetThreshold of facetThresholds) {
+                            for (const facetOrder of facetOrders) {
+                                for (const maxFacet of maxFacets) {
+                                    for (const narrowPixel of narrowPixelRuns) {
+                                        for (const borderSegment of borderSegments) {
+                                            const settings = new Settings();
+                                            settings.resizeImageWidth = width;
+                                            settings.resizeImageHeight = height;
+                                            settings.kMeansNrOfClusters = cluster;
+                                            settings.kMeansClusteringColorSpace = colorSpace;
+                                            settings.removeFacetsSmallerThanNrOfPoints = facetThreshold;
+                                            settings.removeFacetsFromLargeToSmall = facetOrder;
+                                            settings.maximumNumberOfFacets = maxFacet;
+                                            settings.narrowPixelStripCleanupRuns = narrowPixel;
+                                            settings.nrOfTimesToHalveBorderSegments = borderSegment;
+                                            combinations.push(settings);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -213,6 +235,9 @@ class ImageExplorer {
                 nrOfClusters: settings.kMeansNrOfClusters,
                 colorSpace: ClusteringColorSpace[settings.kMeansClusteringColorSpace],
                 facetThreshold: settings.removeFacetsSmallerThanNrOfPoints,
+                facetOrderLargeToSmall: settings.removeFacetsFromLargeToSmall,
+                maxFacets: settings.maximumNumberOfFacets,
+                narrowPixelCleanup: settings.narrowPixelStripCleanupRuns,
                 borderSegments: settings.nrOfTimesToHalveBorderSegments
             }
         };
@@ -284,11 +309,14 @@ class ImageExplorer {
     private generateId(settings: Settings, index: number): string {
         const parts = [
             `idx${index}`,
-            `w${settings.resizeImageWidth}`,
+            `w${settings.resizeImageWidth}h${settings.resizeImageHeight}`,
             `c${settings.kMeansNrOfClusters}`,
             `cs${ClusteringColorSpace[settings.kMeansClusteringColorSpace]}`,
-            `f${settings.removeFacetsSmallerThanNrOfPoints}`,
-            `b${settings.nrOfTimesToHalveBorderSegments}`
+            `ft${settings.removeFacetsSmallerThanNrOfPoints}`,
+            `fo${settings.removeFacetsFromLargeToSmall ? 'L2S' : 'S2L'}`,
+            `mf${settings.maximumNumberOfFacets === Infinity ? 'inf' : settings.maximumNumberOfFacets}`,
+            `np${settings.narrowPixelStripCleanupRuns}`,
+            `bs${settings.nrOfTimesToHalveBorderSegments}`
         ];
         return parts.join('_');
     }
@@ -499,6 +527,13 @@ class ImageExplorer {
                 </select>
             </div>
             <div class="filter-group">
+                <label>Image Height:</label>
+                <select id="filter-height" onchange="applyFilters()">
+                    <option value="all">All</option>
+                    ${this.getUniqueValues('resizeImageHeight').map(v => `<option value="${v}">${v}px</option>`).join('')}
+                </select>
+            </div>
+            <div class="filter-group">
                 <label>Number of Clusters:</label>
                 <select id="filter-clusters" onchange="applyFilters()">
                     <option value="all">All</option>
@@ -520,6 +555,27 @@ class ImageExplorer {
                 </select>
             </div>
             <div class="filter-group">
+                <label>Facet Order:</label>
+                <select id="filter-facetorder" onchange="applyFilters()">
+                    <option value="all">All</option>
+                    ${this.getUniqueValues('facetOrderLargeToSmall').map(v => `<option value="${v}">${v ? 'Large to Small' : 'Small to Large'}</option>`).join('')}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Max Facets:</label>
+                <select id="filter-maxfacets" onchange="applyFilters()">
+                    <option value="all">All</option>
+                    ${this.getUniqueValues('maxFacets').map(v => `<option value="${v}">${v === Infinity ? '∞' : v}</option>`).join('')}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Narrow Pixel Cleanup:</label>
+                <select id="filter-narrowpixel" onchange="applyFilters()">
+                    <option value="all">All</option>
+                    ${this.getUniqueValues('narrowPixelCleanup').map(v => `<option value="${v}">${v} runs</option>`).join('')}
+                </select>
+            </div>
+            <div class="filter-group">
                 <label>Border Segments:</label>
                 <select id="filter-border" onchange="applyFilters()">
                     <option value="all">All</option>
@@ -536,17 +592,25 @@ class ImageExplorer {
     <script>
         function applyFilters() {
             const width = document.getElementById('filter-width').value;
+            const height = document.getElementById('filter-height').value;
             const clusters = document.getElementById('filter-clusters').value;
             const colorspace = document.getElementById('filter-colorspace').value;
             const facet = document.getElementById('filter-facet').value;
+            const facetorder = document.getElementById('filter-facetorder').value;
+            const maxfacets = document.getElementById('filter-maxfacets').value;
+            const narrowpixel = document.getElementById('filter-narrowpixel').value;
             const border = document.getElementById('filter-border').value;
 
             document.querySelectorAll('.result-card').forEach(card => {
                 const show = (
                     (width === 'all' || card.dataset.width === width) &&
+                    (height === 'all' || card.dataset.height === height) &&
                     (clusters === 'all' || card.dataset.clusters === clusters) &&
                     (colorspace === 'all' || card.dataset.colorspace === colorspace) &&
                     (facet === 'all' || card.dataset.facet === facet) &&
+                    (facetorder === 'all' || card.dataset.facetorder === facetorder) &&
+                    (maxfacets === 'all' || card.dataset.maxfacets === maxfacets) &&
+                    (narrowpixel === 'all' || card.dataset.narrowpixel === narrowpixel) &&
                     (border === 'all' || card.dataset.border === border)
                 );
 
@@ -564,13 +628,16 @@ class ImageExplorer {
         fs.writeFileSync(path.join(this.config.outputDir, 'report.html'), html);
     }
 
-    private getUniqueValues(field: string): (string | number)[] {
-        const values = new Set<string | number>();
+    private getUniqueValues(field: string): (string | number | boolean)[] {
+        const values = new Set<string | number | boolean>();
         this.results.forEach(result => {
-            let value: string | number;
+            let value: string | number | boolean;
             switch (field) {
                 case 'resizeImageWidth':
                     value = result.settings.resizeImageWidth;
+                    break;
+                case 'resizeImageHeight':
+                    value = result.settings.resizeImageHeight;
                     break;
                 case 'kMeansNrOfClusters':
                     value = result.stats.nrOfClusters;
@@ -580,6 +647,15 @@ class ImageExplorer {
                     break;
                 case 'facetThreshold':
                     value = result.stats.facetThreshold;
+                    break;
+                case 'facetOrderLargeToSmall':
+                    value = result.stats.facetOrderLargeToSmall;
+                    break;
+                case 'maxFacets':
+                    value = result.stats.maxFacets;
+                    break;
+                case 'narrowPixelCleanup':
+                    value = result.stats.narrowPixelCleanup;
                     break;
                 case 'borderSegments':
                     value = result.stats.borderSegments;
@@ -596,9 +672,13 @@ class ImageExplorer {
         return `
             <div class="result-card"
                  data-width="${result.settings.resizeImageWidth}"
+                 data-height="${result.settings.resizeImageHeight}"
                  data-clusters="${result.stats.nrOfClusters}"
                  data-colorspace="${result.stats.colorSpace}"
                  data-facet="${result.stats.facetThreshold}"
+                 data-facetorder="${result.stats.facetOrderLargeToSmall}"
+                 data-maxfacets="${result.stats.maxFacets}"
+                 data-narrowpixel="${result.stats.narrowPixelCleanup}"
                  data-border="${result.stats.borderSegments}">
                 <div class="image-container">
                     <img src="${path.basename(result.outputPath)}" alt="${result.id}">
@@ -621,6 +701,18 @@ class ImageExplorer {
                         <div class="stat-row">
                             <div class="stat-label">Facet Threshold:</div>
                             <div class="stat-value">${result.stats.facetThreshold}</div>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-label">Facet Order:</div>
+                            <div class="stat-value">${result.stats.facetOrderLargeToSmall ? 'L→S' : 'S→L'}</div>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-label">Max Facets:</div>
+                            <div class="stat-value">${result.stats.maxFacets === Infinity ? '∞' : result.stats.maxFacets}</div>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-label">Narrow Pixel:</div>
+                            <div class="stat-value">${result.stats.narrowPixelCleanup} runs</div>
                         </div>
                         <div class="stat-row">
                             <div class="stat-label">Border Halving:</div>

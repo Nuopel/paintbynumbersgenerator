@@ -1,9 +1,13 @@
 {
   "variations": {
     "resizeImageWidth": [512, 1024],
+    "resizeImageHeight": [512, 1024],
     "kMeansNrOfClusters": [8, 16, 24, 32],
     "kMeansClusteringColorSpace": [0, 1, 2],
     "removeFacetsSmallerThanNrOfPoints": [10, 20, 50],
+    "removeFacetsFromLargeToSmall": [true, false],
+    "maximumNumberOfFacets": [100, 200],
+    "narrowPixelStripCleanupRuns": [0, 1, 3],
     "nrOfTimesToHalveBorderSegments": [1, 2, 3]
   }
 }
